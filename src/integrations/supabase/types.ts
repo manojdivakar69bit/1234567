@@ -14,7 +14,213 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agents: {
+        Row: {
+          approval_status: string
+          created_at: string
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          approval_status?: string
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          approval_status?: string
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      call_logs: {
+        Row: {
+          caller_info: Json | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          qr_code: string
+          status: string
+        }
+        Insert: {
+          caller_info?: Json | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          qr_code: string
+          status?: string
+        }
+        Update: {
+          caller_info?: Json | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          qr_code?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          address: string | null
+          blood_group: string | null
+          created_at: string
+          id: string
+          name: string
+          qr_code_id: string
+          updated_at: string
+          vehicle_number: string | null
+        }
+        Insert: {
+          address?: string | null
+          blood_group?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          qr_code_id: string
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Update: {
+          address?: string | null
+          blood_group?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          qr_code_id?: string
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_qr_code_id_fkey"
+            columns: ["qr_code_id"]
+            isOneToOne: false
+            referencedRelation: "qr_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      emergency_contacts: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          phone: string
+          qr_code_id: string
+          relationship: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          phone: string
+          qr_code_id: string
+          relationship?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string
+          qr_code_id?: string
+          relationship?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emergency_contacts_qr_code_id_fkey"
+            columns: ["qr_code_id"]
+            isOneToOne: false
+            referencedRelation: "qr_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      print_history: {
+        Row: {
+          code_from: string | null
+          code_to: string | null
+          count: number | null
+          created_at: string
+          id: string
+          printed_at: string
+          printed_by: string | null
+        }
+        Insert: {
+          code_from?: string | null
+          code_to?: string | null
+          count?: number | null
+          created_at?: string
+          id?: string
+          printed_at?: string
+          printed_by?: string | null
+        }
+        Update: {
+          code_from?: string | null
+          code_to?: string | null
+          count?: number | null
+          created_at?: string
+          id?: string
+          printed_at?: string
+          printed_by?: string | null
+        }
+        Relationships: []
+      }
+      qr_codes: {
+        Row: {
+          assigned_agent_id: string | null
+          code: string
+          created_at: string
+          id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_agent_id?: string | null
+          code: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_agent_id?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_codes_assigned_agent_id_fkey"
+            columns: ["assigned_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
