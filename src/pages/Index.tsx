@@ -51,16 +51,17 @@ const Index = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10">
       {/* Logo */}
       <div className={`transition-all duration-700 ${loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-        <img src="/logo.png" alt="Call My Family" style={{ width: 80, height: 80 }} className="object-contain mx-auto mb-2" />
+        <img src="/logo.png" alt="Call My Family" style={{ width: 120, height: 120 }} className="object-contain mx-auto mb-2" />
+        <div className="text-center font-bold text-foreground" style={{ fontSize: 48 }}>Call My Family</div>
       </div>
 
       {/* Tagline */}
       <div className="text-center mb-6 min-h-[4.5rem]">
-        <div className="font-semibold text-foreground" style={{ fontSize: 32 }}>
+        <div className="font-semibold text-foreground" style={{ fontSize: 29 }}>
           {line1.started && line1.displayed}
           {line1.started && !line1.done && <span className="animate-blink">|</span>}
         </div>
-        <div className="font-semibold text-primary" style={{ fontSize: 32 }}>
+        <div className="font-semibold text-primary" style={{ fontSize: 25 }}>
           {line2.started && line2.displayed}
           {line2.started && !allTyped && <span className="animate-blink">|</span>}
         </div>
