@@ -51,8 +51,8 @@ const Index = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10">
       {/* Logo */}
       <div className={`transition-all duration-700 ${loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-        <img src="/logo.png" alt="Call My Family" style={{ width: 120, height: 120 }} className="object-contain mx-auto mb-2" />
-        <div className="text-center font-bold text-foreground" style={{ fontSize: 48 }}>Call My Family</div>
+        <img src="/logo.png" alt="Call My Family" style={{ width: 90, height: 90 }} className="object-contain mx-auto mb-2" />
+        <div className="text-center font-bold text-foreground" style={{ fontSize: 34 }}>Call My Family</div>
       </div>
 
       {/* Tagline */}
