@@ -21,12 +21,21 @@ jobs:
       - name: Install myqr
         run: pip install myqr
 
+      - name: Copy logo to working directory
+        run: |
+          ls -la
+          cp logo.png ./temp_logo.png || echo "logo.png not found"
+
       - name: Generate QR with logo
         run: |
-          myqr "https://github.com/manojdivakar69/1234567" -p "logo.png" -c -n "final_qr.png" -l H
+          myqr "https://github.com/manojdivakar69/1234567" \
+               -p "./logo.png" \
+               -c \
+               -n "final_qr.png" \
+               -l H
 
-      - name: Commit and push QR code
+      - name: Commit and push
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Auto-generate QR code with logo"
+          commit_message: "Added QR code"
           file_pattern: "final_qr.png"
