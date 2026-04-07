@@ -13,11 +13,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: List all files
-        run: |
-          ls -la
-          ls -la assets/ || echo "assets folder not found"
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -28,23 +23,10 @@ jobs:
 
       - name: Generate QR with logo
         run: |
-          python -c "
-from MyQR import myqr
-try:
-    myqr.run(
-        words='https://github.com/manojdivakar69/1234567',
-        picture='logo.png',
-        colorized=True,
-        save_name='final_qr.png',
-        level='H'
-    )
-    print('Success!')
-except Exception as e:
-    print('Error:', e)
-    exit(1)
-"
+          myqr "https://github.com/manojdivakar69/1234567" -p "logo.png" -c -n "final_qr.png" -l H
+
       - name: Commit and push QR code
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Auto-generate QR code with logo"
-          file_pattern: 'final_qr.png'
+          file_pattern: "final_qr.png"
