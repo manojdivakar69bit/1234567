@@ -19,17 +19,19 @@ const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }
     const hCm = stickerHeight;
 
     const qrMarkup = renderToStaticMarkup(
-      <QRCodeSVG value={url} size={Math.min(wCm, hCm) * 25} level="M" />
+      <QRCodeSVG value={url} size={Math.min(wCm, hCm) * 25} level="H" />
     );
 
     const stickerHtml = `<!DOCTYPE html>
 <html><head><title>QR Sticker - ${code}</title>
 <style>
   @page { size: ${wCm}cm ${hCm}cm; margin: 0; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
   .sticker { width: ${wCm}cm; height: ${hCm}cm; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 0.3cm; }
-  .header { background: #dc2626; color: white; width: 100%; text-align: center; padding: 0.2cm; font-weight: bold; font-size: ${Math.max(8, wCm * 2)}pt; border-radius: 4px; }
+  .header { background: #dc2626; color: white; width: 100%; text-align: center; padding: 0.2cm; font-weight: bold; font-size: ${Math.max(8, wCm * 2)}pt; border-radius: 4px;display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .header img { height: 20px; width: auto; background: white; border-radius: 3px; padding: 2px; }
   .scan-text { font-size: ${Math.max(6, wCm * 1.2)}pt; color: #666; text-transform: uppercase; letter-spacing: 1px; }
   .qr { flex: 1; display: flex; align-items: center; justify-content: center; }
   .code { font-family: monospace; font-size: ${Math.max(8, wCm * 1.8)}pt; font-weight: bold; color: #333; }
@@ -37,7 +39,7 @@ const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }
   @media print { body { margin: 0; } .no-print { display: none; } }
 </style></head><body>
 <div class="sticker">
-  <div class="header">Call My Family 👍</div>
+  <div class="header"><img src="${window.location.origin}/logo.png" alt="logo" /><span>Call My Family 👍</span></div>
   <div class="scan-text">SCAN IN EMERGENCY</div>
   <div class="qr">${qrMarkup}</div>
   <div class="code">${code}</div>
@@ -66,10 +68,10 @@ const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }
   return (
     <div className="space-y-3">
       <div className="border rounded-lg p-4 text-center space-y-2">
-        <div className="bg-primary text-primary-foreground px-3 py-1 rounded font-bold text-sm">Call My Family 👍</div>
+        <div className="bg-primary text-primary-foreground px-3 py-1 rounded font-bold text-sm flex items-center justify-center gap-2"><img src="/logo.png" alt="logo" className="h-5 w-auto bg-white rounded p-0.5" /><span>Call My Family 👍</span></div>
         <div className="text-xs text-muted-foreground uppercase tracking-wider">SCAN IN EMERGENCY</div>
         <div className="flex justify-center">
-          <QRCodeSVG value={`${baseUrl}/emergency/${code}`} size={120} level="M" />
+          <QRCodeSVG value={`${baseUrl}/emergency/${code}`} size={120} level="H" />
         </div>
         <div className="font-mono font-bold">{code}</div>
         <div className="bg-primary text-primary-foreground px-3 py-1 rounded text-xs">Protected by CallMyFamily</div>
