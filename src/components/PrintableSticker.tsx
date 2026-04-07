@@ -19,12 +19,25 @@ const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }
     const hCm = stickerHeight;
 
     const qrMarkup = renderToStaticMarkup(
-      <QRCodeSVG value={url} size={Math.min(wCm, hCm) * 25} level="H" />
+      <QRCodeSVG 
+        value={url} 
+        size={Math.min(wCm, hCm) * 27} 
+        level="H" 
+        includeMargin={true} 
+      />
     );
 
     const stickerHtml = `<!DOCTYPE html>
 <html><head><title>QR Sticker - ${code}</title>
-<style>
+<<style>
+ /* ==================== COLOR PRINT FIX ==================== */
+  * { 
+    -webkit-print-color-adjust: exact !important; 
+    print-color-adjust: exact !important; 
+    color-adjust: exact !important; 
+  }
+  /* ======================================================= */
+  
   @page { size: ${wCm}cm ${hCm}cm; margin: 0; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
