@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 interface PrintableStickerProps {
   code: string;
+  orgName?: string;
   vehicleNumber?: string;
   bloodGroup?: string;
   baseUrl: string;
@@ -12,7 +13,7 @@ interface PrintableStickerProps {
   stickerHeight?: number;
 }
 
-const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }: PrintableStickerProps) => {
+const PrintableSticker = ({ code, baseUrl, orgName = "Call My Family 👍", stickerWidth = 6, stickerHeight = 8 }: PrintableStickerProps) => {
   const handlePrint = () => {
     const url = `${baseUrl}/emergency/${code}`;
     const wCm = stickerWidth;
@@ -30,14 +31,11 @@ const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }
     const stickerHtml = `<!DOCTYPE html>
 <html><head><title>QR Sticker - ${code}</title>
 <style>
-/* ==================== COLOR PRINT FIX ==================== */
   * { 
     -webkit-print-color-adjust: exact !important; 
     print-color-adjust: exact !important; 
     color-adjust: exact !important; 
   }
-  /* ======================================================= */
-
   @page { size: ${wCm}cm ${hCm}cm; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { 
@@ -112,12 +110,10 @@ const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }
     border-radius: 6px;
     margin-top: 0.2cm;
   }
-  @media print { 
-    body { margin: 0; } 
-  }
+  @media print { body { margin: 0; } }
 </style></head><body>
 <div class="sticker">
-  <div class="header"><img src="${window.location.origin}/logo.png" alt="logo" /><span>Call My Family 👍</span></div>
+  <div class="header"><img src="${window.location.origin}/logo.png" alt="logo" /><span>${orgName}</span></div>
   <div class="scan-text">SCAN IN EMERGENCY</div>
   <div class="qr">${qrMarkup}</div>
   <div class="code">${code}</div>
@@ -130,7 +126,6 @@ const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }
     const blobUrl = URL.createObjectURL(blob);
     const printWindow = window.open(blobUrl, "_blank");
     if (!printWindow) {
-      // Fallback: try with document.write
       const fw = window.open("", "_blank");
       if (fw) {
         fw.document.write(stickerHtml);
@@ -139,14 +134,16 @@ const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }
         alert("Please allow popups to print stickers");
       }
     }
-    // Clean up blob URL after a delay
     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
   };
 
   return (
     <div className="space-y-3">
       <div className="border rounded-lg p-4 text-center space-y-2">
-        <div className="bg-primary text-primary-foreground px-3 py-1 rounded font-bold text-sm flex items-center justify-center gap-2"><img src="/logo.png" alt="logo" className="h-5 w-auto bg-white rounded p-0.5" /><span>Call My Family 👍</span></div>
+        <div className="bg-primary text-primary-foreground px-3 py-1 rounded font-bold text-sm flex items-center justify-center gap-2">
+          <img src="/logo.png" alt="logo" className="h-5 w-auto bg-white rounded p-0.5" />
+          <span>{orgName}</span>
+        </div>
         <div className="text-xs text-muted-foreground uppercase tracking-wider">SCAN IN EMERGENCY</div>
         <div className="flex justify-center">
           <QRCodeSVG value={`${baseUrl}/emergency/${code}`} size={120} level="H" />
