@@ -1,0 +1,30 @@
+name: QR
+
+on:
+  workflow_dispatch:
+
+jobs:
+  qr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+      - run: pip install segno pillow
+      - run: |
+          python -c "
+import segno
+from PIL import Image
+qr = segno.make('https://github.com/manojdivakar69/1234567', error='h')
+qr.save('temp.png', scale=10)
+img = Image.open('temp.png')
+logo = Image.open('logo.png').convert('RGBA')
+s = img.width // 4
+logo = logo.resize((s, s), Image.LANCZOS)
+x = (img.width - s) // 2
+y = (img.height - s) // 2
+img.paste(logo, (x, y), logo)
+img.save('final_qr.png')
+"
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          file_pattern: 'final_qr.png'
