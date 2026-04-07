@@ -103,6 +103,7 @@ const EmergencyPage = () => {
   return (
     <div className="min-h-screen bg-background p-4 max-w-md mx-auto space-y-4">
       <div className="text-center py-4">
+        <img src="/logo.png" alt="Call My Family" style={{ width: 80, height: 80 }} className="mx-auto mb-2" />
         <h1 className="text-3xl font-bold text-primary">🚨 EMERGENCY</h1>
         <p className="text-muted-foreground">QR Code: {code}</p>
       </div>
