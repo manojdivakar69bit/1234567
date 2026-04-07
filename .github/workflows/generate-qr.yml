@@ -1,0 +1,39 @@
+name: Generate QR Code with Logo
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install myqr
+        run: pip install myqr
+
+      - name: Create output folder
+        run: mkdir -p assets/qr_output
+
+      - name: Generate QR with logo
+        run: |
+          myqr "https://github.com/manojdivakar69/1234567" \
+               -p "assets/logo.png" \
+               -c \
+               -n "final_qr.png" \
+               -d "assets/qr_output/"
+
+      - name: Commit and push QR code
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Auto-generate QR code with logo"
+          file_pattern: 'assets/qr_output/*.png'
