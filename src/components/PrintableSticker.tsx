@@ -30,26 +30,91 @@ const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }
     const stickerHtml = `<!DOCTYPE html>
 <html><head><title>QR Sticker - ${code}</title>
 <<style>
- /* ==================== COLOR PRINT FIX ==================== */
+/* ==================== COLOR PRINT FIX ==================== */
   * { 
     -webkit-print-color-adjust: exact !important; 
     print-color-adjust: exact !important; 
     color-adjust: exact !important; 
   }
   /* ======================================================= */
-  
+
   @page { size: ${wCm}cm ${hCm}cm; margin: 0; }
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-  .sticker { width: ${wCm}cm; height: ${hCm}cm; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 0.3cm; }
-  .header { background: #dc2626; color: white; width: 100%; text-align: center; padding: 0.2cm; font-weight: bold; font-size: ${Math.max(8, wCm * 2)}pt; border-radius: 4px;display: flex; align-items: center; justify-content: center; gap: 6px; }
-  .header img { height: 20px; width: auto; background: white; border-radius: 3px; padding: 2px; }
-  .scan-text { font-size: ${Math.max(6, wCm * 1.2)}pt; color: #666; text-transform: uppercase; letter-spacing: 1px; }
-  .qr { flex: 1; display: flex; align-items: center; justify-content: center; }
-  .code { font-family: monospace; font-size: ${Math.max(8, wCm * 1.8)}pt; font-weight: bold; color: #333; }
-  .footer { background: #dc2626; color: white; width: 100%; text-align: center; padding: 0.15cm; font-size: ${Math.max(5, wCm * 1)}pt; border-radius: 4px; }
-  @media print { body { margin: 0; } .no-print { display: none; } }
+  body { 
+    font-family: Arial, sans-serif; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    min-height: 100vh; 
+    background: white;
+  }
+  .sticker { 
+    width: ${wCm}cm; 
+    height: ${hCm}cm; 
+    border: 1px solid #ddd; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    padding: 0.35cm; 
+    background: white;
+  }
+  .header { 
+    background: #dc2626; 
+    color: white; 
+    width: 100%; 
+    text-align: center; 
+    padding: 0.25cm 0.2cm; 
+    font-weight: bold; 
+    font-size: ${Math.max(9.5, wCm * 2.3)}pt; 
+    border-radius: 6px;
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 8px;
+    margin-bottom: 0.35cm;
+  }
+  .header img { 
+    height: 26px; 
+    width: auto; 
+    background: white; 
+    border-radius: 4px; 
+    padding: 3px; 
+  }
+  .scan-text { 
+    font-size: ${Math.max(7.5, wCm * 1.35)}pt; 
+    color: #444; 
+    text-transform: uppercase; 
+    letter-spacing: 1.3px; 
+    margin-bottom: 0.4cm;
+    font-weight: 500;
+  }
+  .qr { 
+    flex: 1; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    margin: 0.1cm 0;
+  }
+  .code { 
+    font-family: monospace; 
+    font-size: ${Math.max(9.5, wCm * 2.1)}pt; 
+    font-weight: bold; 
+    color: #222; 
+    margin: 0.25cm 0 0.15cm 0;
+  }
+  .footer { 
+    background: #dc2626; 
+    color: white; 
+    width: 100%; 
+    text-align: center; 
+    padding: 0.18cm; 
+    font-size: ${Math.max(6, wCm * 1.15)}pt; 
+    border-radius: 6px;
+    margin-top: 0.2cm;
+  }
+  @media print { 
+    body { margin: 0; } 
+  }
 </style></head><body>
 <div class="sticker">
   <div class="header"><img src="${window.location.origin}/logo.png" alt="logo" /><span>Call My Family 👍</span></div>
