@@ -29,7 +29,7 @@ const PrintableSticker = ({ code, baseUrl, stickerWidth = 6, stickerHeight = 8 }
 
     const stickerHtml = `<!DOCTYPE html>
 <html><head><title>QR Sticker - ${code}</title>
-<<style>
+<style>
 /* ==================== COLOR PRINT FIX ==================== */
   * { 
     -webkit-print-color-adjust: exact !important; 
