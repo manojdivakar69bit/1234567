@@ -11,6 +11,7 @@ interface PrintableStickerProps {
   baseUrl: string;
   stickerWidth?: number;
   stickerHeight?: number;
+    logoUrl?: string
 }
 
  const PrintableSticker = ({ 
