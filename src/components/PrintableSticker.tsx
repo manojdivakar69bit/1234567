@@ -37,6 +37,72 @@ interface PrintableStickerProps {
     );
     const logo = logoUrl || "/logo.png";
 
+const stickerHtml = `
+<html>
+<head>
+  <style>
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    body {
+      font-family: Arial;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .box {
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: ${wCm}cm;
+      height: ${hCm}cm;
+      margin: auto;
+      border-radius: 10px;
+    }
+
+    .header {
+      background: black;
+      color: white;
+      padding: 6px;
+      border-radius: 6px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      font-weight: bold;
+    }
+
+    .header img {
+      height: 20px;
+      background: white;
+      padding: 2px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="box">
+
+    <div class="header">
+      <img src="${logo}" />
+      <span>${orgName}</span>
+    </div>
+
+    <p>SCAN IN EMERGENCY</p>
+
+    <div>${qrMarkup}</div>
+
+    <p><b>${code}</b></p>
+
+  </div>
+
+</body>
+</html>
+`;
+
     const stickerHtml = `<!DOCTYPE html>
 <html><head><title>QR Sticker - ${code}</title>
 <style>
