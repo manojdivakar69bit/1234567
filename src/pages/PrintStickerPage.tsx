@@ -38,6 +38,7 @@ const PrintStickerPage = () => {
   });
 
   if (isLoading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  console.log("PROFILE DATA:", data?.profile);
 
   if (error || !data) {
     return (
