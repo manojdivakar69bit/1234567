@@ -35,6 +35,7 @@ interface PrintableStickerProps {
         includeMargin={true} 
       />
     );
+    const logo = logoUrl || "/logo.png";
 
     const stickerHtml = `<!DOCTYPE html>
 <html><head><title>QR Sticker - ${code}</title>
