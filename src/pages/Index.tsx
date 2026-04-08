@@ -84,6 +84,7 @@ const Index = () => {
         <div className="flex flex-col gap-3">
           <Button asChild className="w-full emergency-gradient hover:opacity-90 text-primary-foreground h-12 text-base rounded-full"><Link to="/login?role=admin">Admin Panel</Link></Button>
           <Button asChild variant="outline" className="w-full h-12 text-base rounded-full"><Link to="/login?role=agent">Agent Panel</Link></Button>
+          <Button asChild variant="outline" className="w-full h-12 text-base rounded-full border-blue-400 text-blue-600 hover:bg-blue-50"><Link to="/login?role=salesman">Salesman Panel</Link></Button>
         </div>
 
         {/* Privacy */}
