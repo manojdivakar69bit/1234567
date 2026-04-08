@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, AlertTriangle, User, Car, Droplets, MapPin, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Phone, AlertTriangle, User, Car, Droplets, MapPin, CheckCircle2, XCircle, Loader2, Camera } from "lucide-react";
 import { toast } from "sonner";
 
 const MASKED_CALL_NUMBER = "09513886363";
@@ -27,57 +27,81 @@ const CallStatusBanner = ({ status, name }: { status: "idle" | "connecting" | "s
 const EmergencyPage = () => {
   const { code } = useParams<{ code: string }>();
   const [callStatus, setCallStatus] = useState<{ status: "idle" | "connecting" | "success" | "error"; name: string }>({ status: "idle", name: "" });
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationError, setLocationError] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [reportSaved, setReportSaved] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-capture location on page load
+  useState(() => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      () => setLocationError(true)
+    );
+  });
+
+  // Save scan report to Supabase
+  const saveScanReport = async (lat?: number, lng?: number, photo?: string) => {
+    if (reportSaved) return;
+    const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : null;
+    await supabase.from("scan_reports").insert({
+      qr_code: code || "",
+      latitude: lat || null,
+      longitude: lng || null,
+      photo_url: photo || null,
+      maps_link: mapsLink,
+    });
+    setReportSaved(true);
+  };
+
+  // Auto save report when location is captured
+  useState(() => {
+    if (location) {
+      saveScanReport(location.lat, location.lng);
+    }
+  });
+
+  // Photo upload handler
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      const fileName = `${code}_${Date.now()}.jpg`;
+      const { error } = await supabase.storage
+        .from("accident-photos")
+        .upload(fileName, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage
+        .from("accident-photos")
+        .getPublicUrl(fileName);
+      setPhotoUrl(urlData.publicUrl);
+      await saveScanReport(location?.lat, location?.lng, urlData.publicUrl);
+      toast.success("Photo uploaded successfully!");
+    } catch {
+      toast.error("Photo upload failed");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
 
   const callMutation = useMutation({
     mutationFn: async ({ phone, name }: { phone: string; name: string }) => {
       setCallStatus({ status: "connecting", name });
-      
-      // Log the call
       await supabase.from("call_logs").insert({
         qr_code: code || "",
         contact_phone: phone,
         contact_name: name,
         status: "initiated",
       });
-
-      // Exotel SID check — jab SID mile tab yahan add karna
-      const EXOTEL_SID = import.meta.env.VITE_EXOTEL_SID;
-      const EXOTEL_KEY = import.meta.env.VITE_EXOTEL_API_KEY;
-      const EXOTEL_TOKEN = import.meta.env.VITE_EXOTEL_API_TOKEN;
-
-      if (EXOTEL_SID && EXOTEL_KEY && EXOTEL_TOKEN) {
-        // Masked call via Exotel
-        try {
-          const response = await fetch(
-            `https://api.exotel.com/v1/Accounts/${EXOTEL_SID}/Calls/connect`,
-            {
-              method: "POST",
-              headers: {
-                "Authorization": "Basic " + btoa(`${EXOTEL_KEY}:${EXOTEL_TOKEN}`),
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body: new URLSearchParams({
-                From: MASKED_CALL_NUMBER,
-                To: phone,
-                CallerId: MASKED_CALL_NUMBER,
-              }),
-            }
-          );
-          if (response.ok) {
-            return { phone, name, method: "masked" };
-          }
-        } catch {
-          // Exotel failed — fallback to direct
-        }
-      }
-
-      // Fallback — Direct call
       window.location.href = `tel:${phone}`;
-      return { phone, name, method: "direct" };
+      return { phone, name };
     },
-    onSuccess: ({ name }) => {
-      setCallStatus({ status: "success", name });
-    },
+    onSuccess: ({ name }) => setCallStatus({ status: "success", name }),
     onError: (_, { name }) => {
       setCallStatus({ status: "error", name });
       toast.error("Failed to initiate call");
@@ -94,18 +118,15 @@ const EmergencyPage = () => {
         .maybeSingle();
       if (qrError) throw qrError;
       if (!qr) throw new Error("QR code not found");
-
       const { data: customer } = await supabase
         .from("customers")
         .select("*")
         .eq("qr_code_id", qr.id)
         .maybeSingle();
-
       const { data: contacts } = await supabase
         .from("emergency_contacts")
         .select("*")
         .eq("qr_code_id", qr.id);
-
       return { qr, customer, contacts: contacts || [] };
     },
     enabled: !!code,
@@ -134,17 +155,45 @@ const EmergencyPage = () => {
   }
 
   const { customer, contacts } = data;
+  const mapsLink = location ? `https://maps.google.com/?q=${location.lat},${location.lng}` : null;
+  const scanTime = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-md mx-auto space-y-4">
+      {/* Header */}
       <div className="text-center py-4">
         <img src="/logo.png" alt="Call My Family" style={{ width: 330, height: 250 }} className="mx-auto mb-2" />
         <h1 className="text-3xl font-bold text-primary">🚨 EMERGENCY</h1>
         <p className="text-muted-foreground">QR Code: {code}</p>
       </div>
 
+      {/* Timestamp + Location Bar */}
+      <Card className="card-shadow border-orange-200 bg-orange-50">
+        <CardContent className="p-3 space-y-1">
+          <div className="flex items-center gap-2 text-sm">
+            <span>🕐</span>
+            <span className="font-medium">Scanned at: {scanTime}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin size={14} className="text-primary" />
+            {location ? (
+              <a href={mapsLink!} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-medium">
+                View Live Location on Maps
+              </a>
+            ) : locationError ? (
+              <span className="text-muted-foreground">Location not available</span>
+            ) : (
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Loader2 size={12} className="animate-spin" /> Getting location...
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <CallStatusBanner status={callStatus.status} name={callStatus.name} />
 
+      {/* Customer Info */}
       {customer && (
         <Card className="card-shadow">
           <CardContent className="p-4 space-y-3">
@@ -170,6 +219,7 @@ const EmergencyPage = () => {
         </Card>
       )}
 
+      {/* Emergency Contacts */}
       <Card className="card-shadow">
         <CardContent className="p-4 space-y-3">
           <h2 className="font-bold text-lg flex items-center gap-2">
@@ -193,6 +243,45 @@ const EmergencyPage = () => {
         </CardContent>
       </Card>
 
+      {/* Accident Photo */}
+      <Card className="card-shadow border-blue-200 bg-blue-50">
+        <CardContent className="p-4 space-y-3">
+          <h2 className="font-bold text-lg flex items-center gap-2">
+            <Camera size={18} className="text-blue-600" /> Accident Photo
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Photo lene se owner ki family ko immediately alert milega
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handlePhotoUpload}
+          />
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={photoUploading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {photoUploading ? (
+              <><Loader2 size={16} className="animate-spin mr-2" /> Uploading...</>
+            ) : (
+              <><Camera size={16} className="mr-2" /> 📸 Take Accident Photo</>
+            )}
+          </Button>
+          {photoUrl && (
+            <div className="mt-2">
+              <img src={photoUrl} alt="Accident" className="w-full rounded-lg border" />
+              <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                <CheckCircle2 size={12} /> Photo saved successfully
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {contacts.length === 0 && !customer && (
         <Card className="card-shadow">
           <CardContent className="p-6 text-center">
@@ -202,12 +291,39 @@ const EmergencyPage = () => {
         </Card>
       )}
 
+      {/* Helpline */}
       <Button
         className="w-full emergency-gradient hover:opacity-90 text-primary-foreground"
         onClick={() => callMutation.mutate({ phone: MASKED_CALL_NUMBER, name: "Helpline" })}
       >
         <Phone size={18} className="mr-2" /> Call Helpline ({MASKED_CALL_NUMBER})
       </Button>
+
+      {/* Quick Emergency Numbers */}
+      <Card className="card-shadow">
+        <CardContent className="p-4">
+          <h2 className="font-bold mb-3">Quick Emergency Numbers</h2>
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant="outline" className="flex flex-col h-16 border-red-200"
+              onClick={() => window.location.href = "tel:108"}>
+              <span className="text-lg">🚑</span>
+              <span className="text-xs">Ambulance 108</span>
+            </Button>
+            <Button variant="outline" className="flex flex-col h-16 border-blue-200"
+              onClick={() => window.location.href = "tel:100"}>
+              <span className="text-lg">🚔</span>
+              <span className="text-xs">Police 100</span>
+            </Button>
+            <Button variant="outline" className="flex flex-col h-16 border-orange-200"
+              onClick={() => window.location.href = "tel:101"}>
+              <span className="text-lg">🚒</span>
+              <span className="text-xs">Fire 101</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="h-4" />
     </div>
   );
 };
