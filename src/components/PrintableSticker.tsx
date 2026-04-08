@@ -13,7 +13,14 @@ interface PrintableStickerProps {
   stickerHeight?: number;
 }
 
-const PrintableSticker = ({ code, baseUrl, orgName = "Call My Family 👍", stickerWidth = 6, stickerHeight = 8 }: PrintableStickerProps) => {
+ const PrintableSticker = ({ 
+  code, 
+  baseUrl, 
+  orgName = "Call My Family 👍", 
+  stickerWidth = 6, 
+  stickerHeight = 8,
+  logoUrl   //
+}: PrintableStickerProps) => {
   const handlePrint = () => {
     const url = `${baseUrl}/emergency/${code}`;
     const wCm = stickerWidth;
