@@ -156,6 +156,62 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount: number
+          collected_by_id: string | null
+          collected_by_role: string
+          created_at: string
+          customer_name: string | null
+          id: string
+          notes: string | null
+          payment_method: string
+          qr_code_id: string | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          collected_by_id?: string | null
+          collected_by_role: string
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          qr_code_id?: string | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          collected_by_id?: string | null
+          collected_by_role?: string
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          qr_code_id?: string | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_qr_code_id_fkey"
+            columns: ["qr_code_id"]
+            isOneToOne: false
+            referencedRelation: "qr_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       print_history: {
         Row: {
           code_from: string | null
@@ -189,6 +245,7 @@ export type Database = {
       qr_codes: {
         Row: {
           assigned_agent_id: string | null
+          assigned_salesman_id: string | null
           code: string
           created_at: string
           id: string
@@ -197,6 +254,7 @@ export type Database = {
         }
         Insert: {
           assigned_agent_id?: string | null
+          assigned_salesman_id?: string | null
           code: string
           created_at?: string
           id?: string
@@ -205,6 +263,7 @@ export type Database = {
         }
         Update: {
           assigned_agent_id?: string | null
+          assigned_salesman_id?: string | null
           code?: string
           created_at?: string
           id?: string
@@ -219,7 +278,47 @@ export type Database = {
             referencedRelation: "agents"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "qr_codes_assigned_salesman_id_fkey"
+            columns: ["assigned_salesman_id"]
+            isOneToOne: false
+            referencedRelation: "salesmen"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      salesmen: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
