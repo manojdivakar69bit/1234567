@@ -33,7 +33,7 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
         return;
       }
 
-      // Agent uses Supabase session
+      // Agent/Salesman uses Supabase session
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setLoading(false); return; }
 
@@ -44,6 +44,15 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
           .eq("user_id", session.user.id)
           .maybeSingle();
         if (!data || data.approval_status !== "approved") { setLoading(false); return; }
+      }
+
+      if (role === "salesman") {
+        const { data } = await supabase
+          .from("salesmen")
+          .select("status")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+        if (!data || data.status !== "active") { setLoading(false); return; }
       }
 
       setAuthorized(true);

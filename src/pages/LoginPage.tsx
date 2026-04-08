@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowLeft, Shield, ScanLine } from "lucide-react";
+import { ArrowLeft, Shield, ScanLine, UserCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const ADMIN_EMAIL = "manojdivakar69@gmail.com";
@@ -21,8 +21,9 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
 
   const isAdmin = role === "admin";
-  const panelLabel = isAdmin ? "Admin" : "Agent";
-  const redirectPath = isAdmin ? "/admin" : "/agent";
+  const isSalesman = role === "salesman";
+  const panelLabel = isAdmin ? "Admin" : isSalesman ? "Salesman" : "Agent";
+  const redirectPath = isAdmin ? "/admin" : isSalesman ? "/salesman" : "/agent";
 
   const checkAgentApproval = async (userId: string) => {
     const { data } = await supabase
@@ -34,28 +35,31 @@ const LoginPage = () => {
     return data.approval_status;
   };
 
+  const checkSalesmanStatus = async (userId: string) => {
+    const { data } = await supabase
+      .from("salesmen")
+      .select("status")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!data) return "not_found";
+    return data.status;
+  };
+
   const handleLogin = async () => {
     setLoading(true);
     try {
       if (isAdmin) {
-        // Admin login: verify hardcoded credentials, then sign in via Supabase
         const storedPwd = localStorage.getItem("cmf_admin_password") || DEFAULT_ADMIN_PASSWORD;
         if (email !== ADMIN_EMAIL || password !== storedPwd) {
           toast.error("Invalid admin credentials");
           return;
         }
         
-        // Try to sign in with Supabase first
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password: DEFAULT_ADMIN_PASSWORD });
+        const { error } = await supabase.auth.signInWithPassword({ email, password: DEFAULT_ADMIN_PASSWORD });
         
         if (error) {
-          // If user doesn't exist, sign them up first (auto-confirm is enabled)
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ 
-            email, 
-            password: DEFAULT_ADMIN_PASSWORD 
-          });
+          const { error: signUpError } = await supabase.auth.signUp({ email, password: DEFAULT_ADMIN_PASSWORD });
           if (signUpError) {
-            // Try signing in again with the stored/default password
             const { error: retryError } = await supabase.auth.signInWithPassword({ email, password });
             if (retryError) throw retryError;
           }
@@ -66,8 +70,27 @@ const LoginPage = () => {
         localStorage.setItem("cmf_admin_auth", "true");
         toast.success("Logged in as Admin");
         navigate(redirectPath);
+      } else if (isSalesman) {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+
+        const status = await checkSalesmanStatus(data.user.id);
+        if (status === "not_found") {
+          await supabase.auth.signOut();
+          toast.error("Salesman profile not found. Contact admin.");
+          return;
+        }
+        if (status !== "active") {
+          await supabase.auth.signOut();
+          toast.error("Your account is inactive. Contact admin.");
+          return;
+        }
+
+        localStorage.setItem("cmf_role", "salesman");
+        localStorage.setItem("cmf_email", data.user?.email || "");
+        toast.success("Logged in as Salesman");
+        navigate(redirectPath);
       } else {
-        // Agent login via Supabase
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
 
@@ -100,18 +123,20 @@ const LoginPage = () => {
     }
   };
 
+  const iconMap: Record<string, React.ReactNode> = {
+    admin: <Shield className="mx-auto mb-2 text-primary" size={40} />,
+    agent: <ScanLine className="mx-auto mb-2 text-primary" size={40} />,
+    salesman: <UserCheck className="mx-auto mb-2 text-primary" size={40} />,
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md card-shadow">
         <CardHeader className="text-center">
-          {isAdmin ? (
-            <Shield className="mx-auto mb-2 text-primary" size={40} />
-          ) : (
-            <ScanLine className="mx-auto mb-2 text-primary" size={40} />
-          )}
+          {iconMap[role] || iconMap.agent}
           <CardTitle className="text-xl">{panelLabel} Login</CardTitle>
           <p className="text-sm text-muted-foreground">
-            {isAdmin ? "Admin access only" : "Sign in to access the Agent Panel"}
+            {isAdmin ? "Admin access only" : `Sign in to access the ${panelLabel} Panel`}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

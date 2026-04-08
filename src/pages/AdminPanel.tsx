@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { QrCode, Users, Package, Plus, Trash2, ArrowLeft, LogOut, CheckCircle2, XCircle, Clock, Settings } from "lucide-react";
+import { QrCode, Users, Package, Plus, Trash2, ArrowLeft, LogOut, CheckCircle2, XCircle, Clock, Settings, IndianRupee, UserCheck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import BulkStickerPrintCard from "@/components/BulkStickerPrintCard";
 import PrintHistoryCard from "@/components/PrintHistoryCard";
@@ -24,12 +24,16 @@ const AdminPanel = () => {
   const [assignFrom, setAssignFrom] = useState("");
   const [assignTo, setAssignTo] = useState("");
   const [assignAgentId, setAssignAgentId] = useState("");
-
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
 
-  // Load QR codes from Supabase
+  // Salesman fields
+  const [salesmanName, setSalesmanName] = useState("");
+  const [salesmanPhone, setSalesmanPhone] = useState("");
+  const [salesmanEmail, setSalesmanEmail] = useState("");
+  const [salesmanPassword, setSalesmanPassword] = useState("");
+
   const { data: qrCodes = [] } = useQuery({
     queryKey: ["qr_codes"],
     queryFn: async () => {
@@ -57,28 +61,39 @@ const AdminPanel = () => {
     },
   });
 
+  const { data: salesmen = [] } = useQuery({
+    queryKey: ["salesmen"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("salesmen").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: allPayments = [] } = useQuery({
+    queryKey: ["all_payments"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("payments").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const pendingAgents = agents.filter((a: any) => a.approval_status === "pending");
   const approvedAgents = agents.filter((a: any) => a.approval_status === "approved");
 
-  // QR code generation - store in Supabase
   const generateQrMutation = useMutation({
     mutationFn: async (count: number) => {
-      // Get the current max QR code number
       const { data: existing } = await supabase.from("qr_codes").select("code").order("code", { ascending: false }).limit(1);
       let maxNum = 0;
       if (existing && existing.length > 0) {
         const match = existing[0].code.match(/EMR-(\d+)/);
         if (match) maxNum = parseInt(match[1], 10);
       }
-
       const newCodes = [];
       for (let i = 1; i <= count; i++) {
-        newCodes.push({
-          code: `EMR-${String(maxNum + i).padStart(5, "0")}`,
-          status: "available",
-        });
+        newCodes.push({ code: `EMR-${String(maxNum + i).padStart(5, "0")}`, status: "available" });
       }
-
       const { data, error } = await supabase.from("qr_codes").insert(newCodes).select();
       if (error) throw error;
       return data;
@@ -87,7 +102,7 @@ const AdminPanel = () => {
       queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
       toast.success(`${codes.length} QR codes generated!`);
     },
-    onError: (e: Error) => toast.error(e.message || "Failed to generate QR codes"),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const approveAgentMutation = useMutation({
@@ -95,10 +110,7 @@ const AdminPanel = () => {
       const { error } = await supabase.from("agents").update({ approval_status: "approved" }).eq("id", agentId);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["agents"] });
-      toast.success("Agent approved!");
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["agents"] }); toast.success("Agent approved!"); },
   });
 
   const rejectAgentMutation = useMutation({
@@ -106,10 +118,7 @@ const AdminPanel = () => {
       const { error } = await supabase.from("agents").update({ approval_status: "rejected" }).eq("id", agentId);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["agents"] });
-      toast.success("Agent rejected");
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["agents"] }); toast.success("Agent rejected"); },
   });
 
   const addAgentMutation = useMutation({
@@ -126,21 +135,33 @@ const AdminPanel = () => {
       setAgentName(""); setAgentPhone(""); setAgentEmail(""); setAgentPassword("");
       toast.success("Agent added!");
     },
-    onError: (e: Error) => toast.error(e.message || "Failed to add agent"),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteAgentMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase.functions.invoke("delete-agent", {
-        body: { agent_id: id },
-      });
+      const { data, error } = await supabase.functions.invoke("delete-agent", { body: { agent_id: id } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["agents"] });
-      toast.success("Agent removed");
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["agents"] }); toast.success("Agent removed"); },
+  });
+
+  const addSalesmanMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("create-salesman", {
+        body: { email: salesmanEmail, password: salesmanPassword, name: salesmanName, phone: salesmanPhone },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salesmen"] });
+      setSalesmanName(""); setSalesmanPhone(""); setSalesmanEmail(""); setSalesmanPassword("");
+      toast.success("Salesman added!");
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const assignQrMutation = useMutation({
@@ -148,22 +169,12 @@ const AdminPanel = () => {
       if (!assignAgentId || !assignFrom || !assignTo) throw new Error("Missing fields");
       const from = assignFrom.toUpperCase();
       const to = assignTo.toUpperCase();
-      
-      // Get QR codes in the range
       const { data: rangeCodes, error: fetchError } = await supabase
-        .from("qr_codes")
-        .select("id, code")
-        .gte("code", from)
-        .lte("code", to)
-        .eq("status", "available");
+        .from("qr_codes").select("id, code").gte("code", from).lte("code", to).eq("status", "available");
       if (fetchError) throw fetchError;
       if (!rangeCodes || rangeCodes.length === 0) throw new Error("No available QR codes in this range");
-
       const ids = rangeCodes.map(q => q.id);
-      const { error } = await supabase
-        .from("qr_codes")
-        .update({ assigned_agent_id: assignAgentId, status: "assigned" })
-        .in("id", ids);
+      const { error } = await supabase.from("qr_codes").update({ assigned_agent_id: assignAgentId, status: "assigned" }).in("id", ids);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -171,7 +182,7 @@ const AdminPanel = () => {
       setAssignFrom(""); setAssignTo(""); setAssignAgentId("");
       toast.success("QR codes assigned to agent!");
     },
-    onError: (e: Error) => toast.error(e.message || "Failed to assign QR codes"),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const handleLogout = async () => {
@@ -184,18 +195,9 @@ const AdminPanel = () => {
 
   const handleChangePassword = () => {
     const storedPwd = localStorage.getItem("cmf_admin_password") || "Admin@123";
-    if (currentPwd !== storedPwd) {
-      toast.error("Current password is incorrect");
-      return;
-    }
-    if (newPwd.length < 6) {
-      toast.error("New password must be at least 6 characters");
-      return;
-    }
-    if (newPwd !== confirmPwd) {
-      toast.error("New passwords do not match");
-      return;
-    }
+    if (currentPwd !== storedPwd) { toast.error("Current password is incorrect"); return; }
+    if (newPwd.length < 6) { toast.error("New password must be at least 6 characters"); return; }
+    if (newPwd !== confirmPwd) { toast.error("New passwords do not match"); return; }
     localStorage.setItem("cmf_admin_password", newPwd);
     setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
     toast.success("Password changed successfully!");
@@ -205,6 +207,7 @@ const AdminPanel = () => {
   const assigned = qrCodes.filter((q: any) => q.status === "assigned").length;
   const activated = qrCodes.filter((q: any) => q.status === "activated").length;
   const baseUrl = window.location.origin;
+  const totalPayments = allPayments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
 
   const getAgentStats = (agentId: string) => {
     const agentQrs = qrCodes.filter((q: any) => q.assigned_agent_id === agentId);
@@ -218,12 +221,13 @@ const AdminPanel = () => {
         <Button variant="ghost" onClick={handleLogout}><LogOut size={18} className="mr-1" /> Logout</Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
           { label: "Total QR Codes", value: qrCodes.length },
           { label: "Available", value: available },
           { label: "Assigned", value: assigned },
           { label: "Activated", value: activated },
+          { label: "Total Revenue", value: `₹${totalPayments}` },
         ].map((s) => (
           <Card key={s.label} className="card-shadow">
             <CardContent className="p-3 text-center">
@@ -235,7 +239,6 @@ const AdminPanel = () => {
       </div>
 
       <div className="space-y-6">
-        {/* Pending Agent Approvals */}
         {pendingAgents.length > 0 && (
           <Card className="card-shadow">
             <CardHeader><CardTitle className="flex items-center gap-2"><Clock size={18} /> Pending Agent Approvals ({pendingAgents.length})</CardTitle></CardHeader>
@@ -261,7 +264,6 @@ const AdminPanel = () => {
           </Card>
         )}
 
-        {/* Generate QR Codes */}
         <Card className="card-shadow">
           <CardHeader><CardTitle className="flex items-center gap-2"><QrCode size={18} /> Generate QR Codes</CardTitle></CardHeader>
           <CardContent className="space-y-3">
@@ -274,7 +276,6 @@ const AdminPanel = () => {
           </CardContent>
         </Card>
 
-        {/* Assign QR Range */}
         <Card className="card-shadow">
           <CardHeader><CardTitle className="flex items-center gap-2"><Package size={18} /> Assign QR Range to Agent</CardTitle></CardHeader>
           <CardContent className="space-y-3">
@@ -285,17 +286,61 @@ const AdminPanel = () => {
             <Select value={assignAgentId} onValueChange={setAssignAgentId}>
               <SelectTrigger><SelectValue placeholder="Select Agent" /></SelectTrigger>
               <SelectContent>
-                {approvedAgents.map((a: any) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                ))}
+                {approvedAgents.map((a: any) => (<SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>))}
               </SelectContent>
             </Select>
             <Button onClick={() => assignQrMutation.mutate()} disabled={!assignFrom || !assignTo || !assignAgentId} className="emergency-gradient hover:opacity-90 text-primary-foreground">Assign</Button>
           </CardContent>
         </Card>
 
-        {/* Bulk Print */}
         <BulkStickerPrintCard baseUrl={baseUrl} printableCount={available + assigned} />
+
+        {/* Salesmen Management */}
+        <Card className="card-shadow">
+          <CardHeader><CardTitle className="flex items-center gap-2"><UserCheck size={18} /> Salesmen ({salesmen.length})</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Input placeholder="Salesman Name" value={salesmanName} onChange={(e) => setSalesmanName(e.target.value)} />
+              <Input placeholder="Phone" value={salesmanPhone} onChange={(e) => setSalesmanPhone(e.target.value)} />
+              <Input placeholder="Email" value={salesmanEmail} onChange={(e) => setSalesmanEmail(e.target.value)} />
+              <Input placeholder="Password" type="password" value={salesmanPassword} onChange={(e) => setSalesmanPassword(e.target.value)} />
+            </div>
+            <Button onClick={() => addSalesmanMutation.mutate()} disabled={!salesmanName || !salesmanEmail || !salesmanPassword || addSalesmanMutation.isPending} className="emergency-gradient hover:opacity-90 text-primary-foreground">
+              <Plus size={14} className="mr-1" /> Add Salesman
+            </Button>
+            {salesmen.map((s: any) => (
+              <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <div className="font-medium">{s.name}</div>
+                  <div className="text-sm text-muted-foreground">{s.email} • {s.phone || "No phone"}</div>
+                </div>
+                <Badge variant={s.status === "active" ? "default" : "secondary"}>{s.status}</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Payment Records */}
+        <Card className="card-shadow">
+          <CardHeader><CardTitle className="flex items-center gap-2"><IndianRupee size={18} /> Payment Records ({allPayments.length}) — Total: ₹{totalPayments}</CardTitle></CardHeader>
+          <CardContent className="space-y-2 max-h-80 overflow-y-auto">
+            {allPayments.map((p: any) => (
+              <div key={p.id} className="flex items-center justify-between p-2 border rounded">
+                <div>
+                  <div className="font-medium">{p.customer_name || "N/A"}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {p.collected_by_role} • {new Date(p.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold">₹{p.amount}</div>
+                  <Badge variant="secondary">{p.payment_method}</Badge>
+                </div>
+              </div>
+            ))}
+            {allPayments.length === 0 && <p className="text-center text-muted-foreground text-sm py-4">No payments yet</p>}
+          </CardContent>
+        </Card>
 
         {/* QR Codes List */}
         <Card className="card-shadow">
@@ -316,7 +361,6 @@ const AdminPanel = () => {
           </CardContent>
         </Card>
 
-        {/* Agents */}
         <Card className="card-shadow">
           <CardHeader><CardTitle className="flex items-center gap-2"><Users size={18} /> Agents ({approvedAgents.length})</CardTitle></CardHeader>
           <CardContent className="space-y-3">
@@ -347,7 +391,6 @@ const AdminPanel = () => {
           </CardContent>
         </Card>
 
-        {/* Customers */}
         <Card className="card-shadow">
           <CardHeader><CardTitle>Customers ({customers.length})</CardTitle></CardHeader>
           <CardContent className="space-y-2 max-h-60 overflow-y-auto">
@@ -361,10 +404,8 @@ const AdminPanel = () => {
           </CardContent>
         </Card>
 
-        {/* Print History */}
         <PrintHistoryCard />
 
-        {/* Settings */}
         <Card className="card-shadow">
           <CardHeader><CardTitle className="flex items-center gap-2"><Settings size={18} /> Settings</CardTitle></CardHeader>
           <CardContent className="space-y-4">
