@@ -28,7 +28,7 @@ const PrintStickerPage = () => {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name")
+        .select("full_name"logo_url")
         .eq("id", qr.user_id)
         .maybeSingle();
 
@@ -59,6 +59,7 @@ const PrintStickerPage = () => {
         code={data.qr.code}
         baseUrl={baseUrl}
         orgName={data.profile?.full_name || "Call My Family 👍"}
+        logoUrl={data.profile?.logo_url}   //
       />
     </div>
   );
