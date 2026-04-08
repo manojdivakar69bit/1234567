@@ -31,14 +31,49 @@ const EmergencyPage = () => {
   const callMutation = useMutation({
     mutationFn: async ({ phone, name }: { phone: string; name: string }) => {
       setCallStatus({ status: "connecting", name });
+      
+      // Log the call
       await supabase.from("call_logs").insert({
         qr_code: code || "",
         contact_phone: phone,
         contact_name: name,
         status: "initiated",
       });
+
+      // Exotel SID check — jab SID mile tab yahan add karna
+      const EXOTEL_SID = import.meta.env.VITE_EXOTEL_SID;
+      const EXOTEL_KEY = import.meta.env.VITE_EXOTEL_API_KEY;
+      const EXOTEL_TOKEN = import.meta.env.VITE_EXOTEL_API_TOKEN;
+
+      if (EXOTEL_SID && EXOTEL_KEY && EXOTEL_TOKEN) {
+        // Masked call via Exotel
+        try {
+          const response = await fetch(
+            `https://api.exotel.com/v1/Accounts/${EXOTEL_SID}/Calls/connect`,
+            {
+              method: "POST",
+              headers: {
+                "Authorization": "Basic " + btoa(`${EXOTEL_KEY}:${EXOTEL_TOKEN}`),
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body: new URLSearchParams({
+                From: MASKED_CALL_NUMBER,
+                To: phone,
+                CallerId: MASKED_CALL_NUMBER,
+              }),
+            }
+          );
+          if (response.ok) {
+            return { phone, name, method: "masked" };
+          }
+        } catch {
+          // Exotel failed — fallback to direct
+        }
+      }
+
+      // Fallback — Direct call
       window.location.href = `tel:${phone}`;
-      return { phone, name };
+      return { phone, name, method: "direct" };
     },
     onSuccess: ({ name }) => {
       setCallStatus({ status: "success", name });
