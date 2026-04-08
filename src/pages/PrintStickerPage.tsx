@@ -14,7 +14,7 @@ const PrintStickerPage = () => {
     queryFn: async () => {
       const { data: qr, error: qrError } = await supabase
         .from("qr_codes")
-        .select("id, code, status, user_id")
+        .select("id, code, status")
         .eq("code", code!)
         .maybeSingle();
       if (qrError) throw qrError;
@@ -26,19 +26,12 @@ const PrintStickerPage = () => {
         .eq("qr_code_id", qr.id)
         .maybeSingle();
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name"logo_url")
-        .eq("id", qr.user_id)
-        .maybeSingle();
-
-      return { qr, customer, profile };
+      return { qr, customer };
     },
     enabled: !!code,
   });
 
   if (isLoading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  console.log("PROFILE DATA:", data?.profile);
 
   if (error || !data) {
     return (
@@ -56,12 +49,10 @@ const PrintStickerPage = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4">
-      <p>{data?.profile?.logo_url}</p>
       <PrintableSticker
         code={data.qr.code}
         baseUrl={baseUrl}
-        orgName={data.profile?.full_name || "Call My Family 👍"}
-        logoUrl={data.profile?.logo_url}   //
+        orgName="Call My Family 👍"
       />
     </div>
   );
