@@ -149,7 +149,11 @@ interface PrintableStickerProps {
     <div className="space-y-3">
       <div className="border rounded-lg p-4 text-center space-y-2">
         <div className="bg-primary text-primary-foreground px-3 py-1 rounded font-bold text-sm flex items-center justify-center gap-2">
-          <img src="/logo.png" alt="logo" className="h-5 w-auto bg-white rounded p-0.5" />
+          <img 
+  src={logoUrl || "/logo.png"} 
+  alt="logo" 
+  className="h-5 w-auto bg-white rounded p-0.5" 
+/>
           <span>{orgName}</span>
         </div>
         <div className="text-xs text-muted-foreground uppercase tracking-wider">SCAN IN EMERGENCY</div>
