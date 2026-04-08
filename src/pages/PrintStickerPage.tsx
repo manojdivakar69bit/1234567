@@ -56,6 +56,7 @@ const PrintStickerPage = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4">
+      <p>{data?.profile?.logo_url}</p>
       <PrintableSticker
         code={data.qr.code}
         baseUrl={baseUrl}
