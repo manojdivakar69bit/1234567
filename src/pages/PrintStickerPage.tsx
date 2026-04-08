@@ -28,7 +28,7 @@ const PrintStickerPage = () => {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name"logo_url")
+        .select("full_name, logo_url")
         .eq("id", qr.user_id)
         .maybeSingle();
 
