@@ -63,19 +63,45 @@ const EmergencyPage = () => {
   });
 
   // Photo upload handler
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoUploading(true);
-    try {
-      const imageUrl = URL.createObjectURL(file);
-setPhotoUrl(imageUrl);
+ const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-await saveScanReport(location?.lat, location?.lng, imageUrl);
+  setPhotoUploading(true);
 
-toast.success("Photo selected successfully!");
+  try {
+    // 👉 Cloudinary upload
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "accident_upload"); // 👈 yaha tera preset name
 
-const message = `🚨 ACCIDENT ALERT!
+    const res = await fetch(
+      "https://api.cloudinary.com/v1_1/dyhgfp2kp/image/upload", // 👈 yaha tera cloud name
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    const data = await res.json();
+
+    if (!data.secure_url) {
+      throw new Error("Upload failed");
+    }
+
+    const imageUrl = data.secure_url;
+
+    // 👉 UI me photo dikhegi
+    setPhotoUrl(imageUrl);
+
+    // 👉 DB save (optional but recommended)
+    await saveScanReport(location?.lat, location?.lng, imageUrl);
+
+    // 👉 success message
+    toast.success("Photo uploaded successfully!");
+
+    // 👉 WhatsApp message
+    const message = `🚨 ACCIDENT ALERT!
 
 📍 Location:
 https://maps.google.com/?q=${location?.lat},${location?.lng}
@@ -83,38 +109,20 @@ https://maps.google.com/?q=${location?.lat},${location?.lng}
 🕐 Time:
 ${new Date().toLocaleString("en-IN")}
 
-📸 Photo taken (see app)
+📸 Photo:
+${imageUrl}
 `;
 
-window.open(`https://wa.me/?text=${encodeURIComponent(message)}`);
-    } catch (err) {
-  console.log("UPLOAD ERROR:", err);
-  toast.error("Photo upload failed");
-    } finally {
-      setPhotoUploading(false);
-    }
-  };
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`);
 
-  const callMutation = useMutation({
-    mutationFn: async ({ phone, name }: { phone: string; name: string }) => {
-      setCallStatus({ status: "connecting", name });
-      await supabase.from("call_logs").insert({
-        qr_code: code || "",
-        contact_phone: phone,
-        contact_name: name,
-        status: "initiated",
-      });
-      window.location.href = `tel:${phone}`;
-      return { phone, name };
-    },
-    onSuccess: ({ name }) => setCallStatus({ status: "success", name }),
-    onError: (_, { name }) => {
-      setCallStatus({ status: "error", name });
-      toast.error("Failed to initiate call");
-    },
-  });
-
-  const { data, isLoading, error } = useQuery({
+  } catch (err) {
+    console.log("UPLOAD ERROR:", err);
+    toast.error("Photo upload failed");
+  } finally {
+    setPhotoUploading(false);
+  }
+};
+    query({
     queryKey: ["emergency", code],
     queryFn: async () => {
       const { data: qr, error: qrError } = await supabase
