@@ -87,7 +87,7 @@ const AgentPanel = () => {
     mutationFn: async (code: string) => {
       const { data, error } = await supabase
         .from("qr_codes")
-        .select("id, code, status")
+        .select("id, code, status, assigned_salesman_id")
         .eq("code", code.trim().toUpperCase())
         .maybeSingle();
       if (error) throw error;
@@ -161,9 +161,11 @@ const AgentPanel = () => {
     mutationFn: async () => {
       if (!paymentAmount || !paymentCustomerName) throw new Error("Amount and customer name required");
       if (paymentMethod === "razorpay") {
+        // ✅ Agent apna account ID pass karega — ₹5 seedha uske account mein
         initiatePayment({
           amount: parseFloat(paymentAmount),
           customerName: paymentCustomerName,
+          agentAccountId: currentAgent?.razorpay_account_id || undefined,
           onSuccess: async (paymentId, orderId) => {
             await savePayment(paymentId, orderId);
           },
@@ -235,7 +237,6 @@ const AgentPanel = () => {
         <Button variant="ghost" onClick={handleLogout}><LogOut size={18} className="mr-1" /> Logout</Button>
       </div>
 
-      {/* Tab buttons */}
       <div className="flex gap-2 flex-wrap">
         <Button variant={activeTab === "register" ? "default" : "outline"} onClick={() => setActiveTab("register")} className={activeTab === "register" ? "emergency-gradient text-primary-foreground" : ""}>
           <ScanLine size={16} className="mr-1" /> Register
@@ -251,6 +252,14 @@ const AgentPanel = () => {
       {/* Payment Tab */}
       {activeTab === "payment" && (
         <>
+          {/* ✅ Agent ka Razorpay account warning */}
+          {!currentAgent?.razorpay_account_id && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="p-3 text-sm text-orange-700">
+                ⚠️ Your Razorpay Linked Account ID is not set. Commission (₹5) will not be transferred automatically. Contact admin to set it up.
+              </CardContent>
+            </Card>
+          )}
           <Card className="card-shadow">
             <CardHeader><CardTitle className="flex items-center gap-2"><IndianRupee size={18} /> Collect Payment</CardTitle></CardHeader>
             <CardContent className="space-y-4">
