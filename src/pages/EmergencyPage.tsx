@@ -42,7 +42,7 @@ const getAddressFromCoords = async (lat: number, lng: number): Promise<string> =
       { headers: { "Accept-Language": "en" } }
     );
     const data = await res.json();
-    return data.display_name || "Address not found";
+    return data.display_name || "Tap the Maps link below to see exact location";
   } catch {
     return "";
   }
