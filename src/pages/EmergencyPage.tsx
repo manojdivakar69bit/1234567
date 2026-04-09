@@ -145,7 +145,7 @@ const EmergencyPage = () => {
 
       const msg =
 `🚨 *ACCIDENT ALERT FROM                
-                      🌎callmyfamily.in!*
+                      🌎callmyfamily.in       
 
 👤 *Name:* ${data?.customer?.name || "Unknown"}
 🚗 *Vehicle:* ${data?.customer?.vehicle_number || "N/A"}
