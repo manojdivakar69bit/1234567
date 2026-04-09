@@ -93,8 +93,10 @@ ${urlData.publicUrl}
 `;
 
 window.open(`https://wa.me/?text=${encodeURIComponent(message)}`);
-    } catch {
-      toast.error("Photo upload failed");
+    } catch (err) {
+  console.log("UPLOAD ERROR:", err);
+  toast.error("Photo upload failed");
+    }
     } finally {
       setPhotoUploading(false);
     }
