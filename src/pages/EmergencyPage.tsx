@@ -69,21 +69,12 @@ const EmergencyPage = () => {
     if (!file) return;
     setPhotoUploading(true);
     try {
-      const fileName = `${code}_${Date.now()}.jpg`;
-const { error } = await supabase.storage
-  .from("accident-photos")
-  const imageUrl = URL.createObjectURL(file);
-setPhotoUrl(imageUrl); { upsert: true });
+      const imageUrl = URL.createObjectURL(file);
+setPhotoUrl(imageUrl);
 
-if (error) throw error;
+await saveScanReport(location?.lat, location?.lng, imageUrl);
 
-const { data: urlData } = supabase.storage
-  .from("accident-photos")
-  .getPublicUrl(fileName);
-
-setPhotoUrl(urlData.publicUrl);
-await saveScanReport(location?.lat, location?.lng, urlData.publicUrl);
-toast.success("Photo uploaded successfully!");
+toast.success("Photo selected successfully!");
 
 const message = `🚨 ACCIDENT ALERT!
 
@@ -93,8 +84,7 @@ https://maps.google.com/?q=${location?.lat},${location?.lng}
 🕐 Time:
 ${new Date().toLocaleString("en-IN")}
 
-📸 Photo:
-${urlData.publicUrl}
+📸 Photo taken (see app)
 `;
 
 window.open(`https://wa.me/?text=${encodeURIComponent(message)}`);
