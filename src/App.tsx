@@ -23,6 +23,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          <Route path="/register" element={<CustomerPanel />} />
           <Route path="/salesman" element={<ProtectedRoute allowedRoles={["admin", "agent", "salesman"]}><SalesmanPanel /></ProtectedRoute>} />
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<LoginPage />} />
