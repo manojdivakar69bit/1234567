@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, AlertTriangle, User, Car, Droplets, MapPin, CheckCircle2, XCircle, Loader2, Camera } from "lucide-react";
+import { Phone, AlertTriangle, User, Car, Droplets, MapPin, CheckCircle2, XCircle, Loader2, Camera, Send } from "lucide-react";
 import { toast } from "sonner";
 
 const MASKED_CALL_NUMBER = "09513886363";
@@ -26,7 +26,6 @@ const CallStatusBanner = ({ status, name }: { status: "idle" | "connecting" | "s
 
 const EmergencyPage = () => {
   const { code } = useParams<{ code: string }>();
-  console.log("CODE:", code);
 
   const [callStatus, setCallStatus] = useState<{ status: "idle" | "connecting" | "success" | "error"; name: string }>({ status: "idle", name: "" });
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -34,6 +33,7 @@ const EmergencyPage = () => {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [reportSaved, setReportSaved] = useState(false);
+  const [waMessage, setWaMessage] = useState<string | null>(null); // ✅ WhatsApp message store
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const callMutation = useMutation({
@@ -48,7 +48,6 @@ const EmergencyPage = () => {
     },
   });
 
-  // Auto-capture location
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
@@ -80,7 +79,6 @@ const EmergencyPage = () => {
     enabled: !!code,
   });
 
-  // Save scan report
   const saveScanReport = async (lat?: number, lng?: number, photo?: string) => {
     if (reportSaved) return;
     const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : null;
@@ -96,7 +94,6 @@ const EmergencyPage = () => {
     if (location) saveScanReport(location.lat, location.lng);
   }, [location]);
 
-  // ✅ FIXED: Photo upload + WhatsApp alert to all contacts
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -117,10 +114,9 @@ const EmergencyPage = () => {
       const imageUrl = uploadData.secure_url;
       setPhotoUrl(imageUrl);
       await saveScanReport(location?.lat, location?.lng, imageUrl);
-      toast.success("Photo upload ho gayi! WhatsApp alerts ja rahe hain...");
 
-      // ✅ WhatsApp message with all details
-      const waMessage = `🚨 *ACCIDENT ALERT!*
+      // ✅ Message taiyar karo aur state mein save karo
+      const msg = `🚨 *ACCIDENT ALERT!*
 
 👤 *${data?.customer?.name || "Unknown"}*
 🚗 *${data?.customer?.vehicle_number || ""}*
@@ -136,25 +132,8 @@ ${imageUrl}
 
 ⚠️ Turant madad karein!`;
 
-      // ✅ Pehle contact ko turant bhejo
-      const contacts = data?.contacts || [];
-      console.log("Contacts:", contacts); // debug ke liye
-
-      if (contacts.length > 0) {
-        const first = contacts[0];
-        const phone1 = first.phone.replace(/\D/g, "");
-        const indiaPhone1 = phone1.startsWith("91") ? phone1 : `91${phone1}`;
-        window.open(`https://wa.me/${indiaPhone1}?text=${encodeURIComponent(waMessage)}`, "_blank");
-      }
-
-      // ✅ Baaki contacts ko delay se bhejo (browser popup block se bachne ke liye)
-      contacts.slice(1).forEach((contact: any, index: number) => {
-        setTimeout(() => {
-          const phone = contact.phone.replace(/\D/g, "");
-          const indiaPhone = phone.startsWith("91") ? phone : `91${phone}`;
-          window.open(`https://wa.me/${indiaPhone}?text=${encodeURIComponent(waMessage)}`, "_blank");
-        }, (index + 1) * 2000);
-      });
+      setWaMessage(msg); // ✅ Buttons dikhenge neeche
+      toast.success("Photo upload ho gayi! Ab neeche se alert bhejo 👇");
 
     } catch (err) {
       console.log("UPLOAD ERROR:", err);
@@ -192,14 +171,12 @@ ${imageUrl}
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-md mx-auto space-y-4">
-      {/* Header */}
       <div className="text-center py-4">
         <img src="/logo.png" alt="Call My Family" style={{ width: 330, height: 250 }} className="mx-auto mb-2" />
         <h1 className="text-3xl font-bold text-primary">🚨 EMERGENCY</h1>
         <p className="text-muted-foreground">QR Code: {code}</p>
       </div>
 
-      {/* Timestamp + Location */}
       <Card className="card-shadow border-orange-200 bg-orange-50">
         <CardContent className="p-3 space-y-1">
           <div className="flex items-center gap-2 text-sm">
@@ -225,7 +202,6 @@ ${imageUrl}
 
       <CallStatusBanner status={callStatus.status} name={callStatus.name} />
 
-      {/* Customer Info */}
       {customer && (
         <Card className="card-shadow">
           <CardContent className="p-4 space-y-3">
@@ -251,7 +227,6 @@ ${imageUrl}
         </Card>
       )}
 
-      {/* Emergency Contacts */}
       <Card className="card-shadow">
         <CardContent className="p-4 space-y-3">
           <h2 className="font-bold text-lg flex items-center gap-2">
@@ -282,7 +257,7 @@ ${imageUrl}
             <Camera size={18} className="text-blue-600" /> Accident Photo
           </h2>
           <p className="text-sm text-muted-foreground">
-            Photo lene se owner ki family ko immediately WhatsApp alert milega
+            Photo lo — phir neeche har contact ko WhatsApp alert bhejo
           </p>
           <input
             ref={fileInputRef}
@@ -303,12 +278,33 @@ ${imageUrl}
               <><Camera size={16} className="mr-2" /> 📸 Take Accident Photo</>
             )}
           </Button>
+
           {photoUrl && (
             <div className="mt-2">
               <img src={photoUrl} alt="Accident" className="w-full rounded-lg border" />
               <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                <CheckCircle2 size={12} /> Photo saved & WhatsApp alert bheja gaya ✅
+                <CheckCircle2 size={12} /> Photo saved successfully
               </p>
+            </div>
+          )}
+
+          {/* ✅ WhatsApp Alert Buttons — photo upload ke baad dikhte hain */}
+          {waMessage && contacts.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm font-bold text-green-700">👇 Ab inhe WhatsApp alert bhejo:</p>
+              {contacts.map((contact: any, i: number) => {
+                const phone = contact.phone.replace(/\D/g, "");
+                const indiaPhone = phone.startsWith("91") ? phone : `91${phone}`;
+                const waLink = `https://wa.me/${indiaPhone}?text=${encodeURIComponent(waMessage)}`;
+                return (
+                  <a key={i} href={waLink} target="_blank" rel="noopener noreferrer">
+                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white mb-1">
+                      <Send size={14} className="mr-2" />
+                      📲 Alert bhejo — {contact.name}
+                    </Button>
+                  </a>
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -323,7 +319,6 @@ ${imageUrl}
         </Card>
       )}
 
-      {/* Helpline */}
       <Button
         className="w-full emergency-gradient hover:opacity-90 text-primary-foreground"
         onClick={() => callMutation.mutate({ phone: MASKED_CALL_NUMBER, name: "Helpline" })}
@@ -331,7 +326,6 @@ ${imageUrl}
         <Phone size={18} className="mr-2" /> Call Helpline ({MASKED_CALL_NUMBER})
       </Button>
 
-      {/* Quick Emergency Numbers */}
       <Card className="card-shadow">
         <CardContent className="p-4">
           <h2 className="font-bold mb-3">Quick Emergency Numbers</h2>
