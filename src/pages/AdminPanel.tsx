@@ -146,6 +146,25 @@ const AdminPanel = () => {
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["agents"] }); toast.success("Agent removed"); },
   });
+  const unassignAllQrMutation = useMutation({
+  mutationFn: async (agentId: string) => {
+    const { error } = await supabase
+      .from("qr_codes")
+      .update({ 
+        assigned_agent_id: null, 
+        status: "available" 
+      })
+      .eq("assigned_agent_id", agentId)
+      .eq("status", "assigned"); // Sirf wahi jo activate nahi huye hain
+
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
+    toast.success("QR codes unassigned from agent");
+  },
+});
+  
 
   const addSalesmanMutation = useMutation({
     mutationFn: async () => {
@@ -251,6 +270,17 @@ const AdminPanel = () => {
                     <div className="text-xs text-muted-foreground">{agent.phone || "No phone"}</div>
                   </div>
                   <div className="flex gap-2">
+                    <Button 
+  variant="outline" 
+  size="sm" 
+  onClick={() => unassignAllQrMutation.mutate(agent.id)}
+  disabled={unassignAllQrMutation.isPending || getAgentStats(agent.id).total === 0}
+  className="h-8 w-8 p-0"
+  title="Unassign QR Codes"
+>
+  <Package size={14} className="text-orange-500" />
+</Button>
+                    
                     <Button size="sm" onClick={() => approveAgentMutation.mutate(agent.id)} className="bg-green-600 hover:bg-green-700 text-primary-foreground">
                       <CheckCircle2 size={14} className="mr-1" /> Approve
                     </Button>
