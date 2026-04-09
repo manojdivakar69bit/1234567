@@ -33,52 +33,42 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-
+        
         <BrowserRouter>
           <Routes>
-            {/* Public Routes */}
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<CustomerPanel />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
 
-            {/* Protected Routes */}
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute allowedRoles={["admin"]}>
-                  <AdminPanel />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/agent"
-              element={
-                <ProtectedRoute allowedRoles={["agent"]}>
-                  <AgentPanel />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/salesman"
-              element={
-                <ProtectedRoute allowedRoles={["admin", "agent", "salesman"]}>
-                  <SalesmanPanel />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/admin" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminPanel />
+              </ProtectedRoute>
+            } />
 
-            {/* Special Routes */}
+            <Route path="/agent" element={
+              <ProtectedRoute allowedRoles={["agent"]}>
+                <AgentPanel />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/salesman" element={
+              <ProtectedRoute allowedRoles={["admin", "agent", "salesman"]}>
+                <SalesmanPanel />
+              </ProtectedRoute>
+            } />
+
             <Route path="/emergency/:code" element={<EmergencyPage />} />
             <Route path="/print/:code" element={<PrintStickerPage />} />
 
-            {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );
+};
 };
 
 export default App;
