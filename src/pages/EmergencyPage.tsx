@@ -80,6 +80,19 @@ const EmergencyPage = () => {
       setPhotoUrl(urlData.publicUrl);
       await saveScanReport(location?.lat, location?.lng, urlData.publicUrl);
       toast.success("Photo uploaded successfully!");
+      const message = `🚨 ACCIDENT ALERT!
+
+📍 Location:
+https://maps.google.com/?q=${location?.lat},${location?.lng}
+
+🕐 Time:
+${new Date().toLocaleString("en-IN")}
+
+📸 Photo:
+${urlData.publicUrl}
+`;
+
+window.open(`https://wa.me/?text=${encodeURIComponent(message)}`);
     } catch {
       toast.error("Photo upload failed");
     } finally {
