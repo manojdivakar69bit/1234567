@@ -101,7 +101,13 @@ const EmergencyPage = () => {
       toast.success("Photo uploaded successfully!");
 
       const message = `🚨 ACCIDENT ALERT!\n\n📍 Location:\nhttps://maps.google.com/?q=${location?.lat},${location?.lng}\n\n🕐 Time:\n${new Date().toLocaleString("en-IN")}\n\n📸 Photo:\n${imageUrl}`;
-      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`);
+      const waMessage = `🚨 ACCIDENT ALERT!\n\n📍 Location:\nhttps://maps.google.com/?q=${location?.lat},${location?.lng}\n\n🕐 Time: ${new Date().toLocaleString("en-IN")}\n\n📸 Photo:\n${imageUrl}`;
+
+data?.contacts?.forEach((contact: any) => {
+  const phone = contact.phone.replace(/\D/g, "");
+  const indiaPhone = phone.startsWith("91") ? phone : `91${phone}`;
+  window.open(`https://wa.me/${indiaPhone}?text=${encodeURIComponent(waMessage)}`);
+});
     } catch (err) {
       console.log("UPLOAD ERROR:", err);
       toast.error("Photo upload failed");
