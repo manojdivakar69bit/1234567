@@ -39,7 +39,6 @@ export function useRazorpayCheckout() {
     }
 
     try {
-      // Create order via edge function
       const { data, error } = await supabase.functions.invoke("create-razorpay-order", {
         body: {
           amount: options.amount,
@@ -62,6 +61,21 @@ export function useRazorpayCheckout() {
         },
         prefill: {
           name: options.customerName,
+        },
+        // ✅ UPI direct open
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: "Pay via UPI",
+                instruments: [{ method: "upi" }],
+              },
+            },
+            sequence: ["block.upi"],
+            preferences: {
+              show_default_blocks: false,
+            },
+          },
         },
         theme: {
           color: "#dc2626",
