@@ -24,7 +24,6 @@ const CallStatusBanner = ({ status, name }: { status: "idle" | "connecting" | "s
   );
 };
 
-// ✅ Location ko Promise se fresh fetch karo
 const getFreshLocation = (): Promise<{ lat: number; lng: number } | null> => {
   return new Promise((resolve) => {
     if (!navigator.geolocation) { resolve(null); return; }
@@ -36,9 +35,21 @@ const getFreshLocation = (): Promise<{ lat: number; lng: number } | null> => {
   });
 };
 
+const getAddressFromCoords = async (lat: number, lng: number): Promise<string> => {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+      { headers: { "Accept-Language": "en" } }
+    );
+    const data = await res.json();
+    return data.display_name || "Address nahi mila";
+  } catch {
+    return "";
+  }
+};
+
 const EmergencyPage = () => {
   const { code } = useParams<{ code: string }>();
-
   const [callStatus, setCallStatus] = useState<{ status: "idle" | "connecting" | "success" | "error"; name: string }>({ status: "idle", name: "" });
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState(false);
@@ -47,8 +58,6 @@ const EmergencyPage = () => {
   const [reportSaved, setReportSaved] = useState(false);
   const [waMessage, setWaMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Location ref — hamesha latest value milegi async functions mein
   const locationRef = useRef<{ lat: number; lng: number } | null>(null);
   useEffect(() => { locationRef.current = location; }, [location]);
 
@@ -76,17 +85,11 @@ const EmergencyPage = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: ["emergency", code],
     queryFn: async () => {
-      const { data: qr, error: qrError } = await supabase
-        .from("qr_codes")
-        .select("id, code, status")
-        .eq("code", code)
-        .maybeSingle();
+      const { data: qr, error: qrError } = await supabase.from("qr_codes").select("id, code, status").eq("code", code).maybeSingle();
       if (qrError) throw qrError;
       if (!qr) throw new Error("QR code not found");
-      const { data: customer } = await supabase
-        .from("customers").select("*").eq("qr_code_id", qr.id).maybeSingle();
-      const { data: contacts } = await supabase
-        .from("emergency_contacts").select("*").eq("qr_code_id", qr.id);
+      const { data: customer } = await supabase.from("customers").select("*").eq("qr_code_id", qr.id).maybeSingle();
+      const { data: contacts } = await supabase.from("emergency_contacts").select("*").eq("qr_code_id", qr.id);
       return { qr, customer, contacts: contacts || [] };
     },
     enabled: !!code,
@@ -111,25 +114,25 @@ const EmergencyPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoUploading(true);
-    toast("📍 Location fetch ho rahi hai...");
+    toast("📍 Location aur photo le raha hai...");
 
     try {
-      // ✅ FRESH location lo — state pe depend mat karo
       let currentLocation = locationRef.current;
       if (!currentLocation) {
         currentLocation = await getFreshLocation();
         if (currentLocation) setLocation(currentLocation);
       }
 
-      // Photo upload
+      // ✅ Address fetch karo
+      let addressName = "";
+      if (currentLocation) {
+        addressName = await getAddressFromCoords(currentLocation.lat, currentLocation.lng);
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("upload_preset", "accident_upload");
-
-      const res = await fetch("https://api.cloudinary.com/v1_1/dyhgfp2kp/image/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch("https://api.cloudinary.com/v1_1/dyhgfp2kp/image/upload", { method: "POST", body: formData });
       const uploadData = await res.json();
       if (!uploadData.secure_url) throw new Error("Upload failed");
 
@@ -137,10 +140,9 @@ const EmergencyPage = () => {
       setPhotoUrl(imageUrl);
       await saveScanReport(currentLocation?.lat, currentLocation?.lng, imageUrl);
 
-      // ✅ Location line — sahi coordinates ya clear message
       const locationLine = currentLocation
-        ? `📍 *Location (Google Maps):*\nhttps://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`
-        : `📍 *Location:* GPS nahi mila — scanner ka pata:\n${data?.customer?.address || "N/A"}`;
+        ? `📍 *Location:*\n${addressName}\n\n🗺️ *Google Maps:*\nhttps://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`
+        : `📍 *Location:* GPS nahi mila\n🏠 *Address:* ${data?.customer?.address || "N/A"}`;
 
       const msg =
 `🚨 *ACCIDENT ALERT!*
@@ -148,20 +150,18 @@ const EmergencyPage = () => {
 👤 *Naam:* ${data?.customer?.name || "Unknown"}
 🚗 *Gaadi:* ${data?.customer?.vehicle_number || "N/A"}
 🩸 *Blood Group:* ${data?.customer?.blood_group || "N/A"}
-🏠 *Address:* ${data?.customer?.address || "N/A"}
 
 ${locationLine}
 
 🕐 *Samay:* ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
 
-📸 *Accident ki Photo (tap karke dekho):*
+📸 *Accident Photo:*
 ${imageUrl}
 
-⚠️ *Kripya turant madad karein!*`;
+⚠️ *Turant madad karein!*`;
 
       setWaMessage(msg);
-      toast.success("✅ Photo ready! Neeche se alert bhejo 👇");
-
+      toast.success("✅ Ready! Neeche se alert bhejo 👇");
     } catch (err) {
       console.log("UPLOAD ERROR:", err);
       toast.error("Photo upload failed");
@@ -170,27 +170,19 @@ ${imageUrl}
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="animate-spin text-primary" size={48} />
-      </div>
-    );
-  }
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="animate-spin text-primary" size={48} /></div>;
 
-  if (error || !data) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md card-shadow text-center">
-          <CardContent className="p-6 space-y-4">
-            <AlertTriangle className="mx-auto text-destructive" size={48} />
-            <h2 className="text-xl font-bold">Not Found</h2>
-            <p className="text-muted-foreground">This QR code does not exist or has not been activated.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  if (error || !data) return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md card-shadow text-center">
+        <CardContent className="p-6 space-y-4">
+          <AlertTriangle className="mx-auto text-destructive" size={48} />
+          <h2 className="text-xl font-bold">Not Found</h2>
+          <p className="text-muted-foreground">This QR code does not exist or has not been activated.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   const { customer, contacts } = data;
   const mapsLink = location ? `https://www.google.com/maps?q=${location.lat},${location.lng}` : null;
@@ -207,30 +199,20 @@ ${imageUrl}
       <Card className="card-shadow border-orange-200 bg-orange-50">
         <CardContent className="p-3 space-y-1">
           <div className="flex items-center gap-2 text-sm">
-            <span>🕐</span>
-            <span className="font-medium">Scanned at: {scanTime}</span>
+            <span>🕐</span><span className="font-medium">Scanned at: {scanTime}</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <MapPin size={14} className="text-primary" />
             {location ? (
-              <a href={mapsLink!} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-medium">
-                📍 Live Location dekho Maps pe
-              </a>
+              <a href={mapsLink!} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-medium">📍 Live Location dekho Maps pe</a>
             ) : locationError ? (
-              <span className="text-red-500 text-xs font-medium">
-                ⚠️ GPS band hai — Settings mein Location ON karo
-              </span>
+              <span className="text-red-500 text-xs font-medium">⚠️ GPS band hai — Settings mein Location ON karo</span>
             ) : (
-              <span className="text-muted-foreground flex items-center gap-1">
-                <Loader2 size={12} className="animate-spin" /> GPS dhundh raha hai...
-              </span>
+              <span className="text-muted-foreground flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> GPS dhundh raha hai...</span>
             )}
           </div>
           {locationError && (
-            <Button size="sm" className="w-full mt-1 bg-orange-500 hover:bg-orange-600 text-white text-xs"
-              onClick={() => window.location.reload()}>
-              🔄 Reload karo
-            </Button>
+            <Button size="sm" className="w-full mt-1 bg-orange-500 hover:bg-orange-600 text-white text-xs" onClick={() => window.location.reload()}>🔄 Reload karo</Button>
           )}
         </CardContent>
       </Card>
@@ -240,44 +222,24 @@ ${imageUrl}
       {customer && (
         <Card className="card-shadow">
           <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <User size={18} className="text-primary" />
-              <span className="font-bold text-lg">{customer.name}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Car size={18} className="text-muted-foreground" />
-              <span>{customer.vehicle_number}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Droplets size={18} className="text-destructive" />
-              <span>Blood: {customer.blood_group}</span>
-            </div>
-            {customer.address && (
-              <div className="flex items-center gap-2">
-                <MapPin size={18} className="text-muted-foreground" />
-                <span>{customer.address}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2"><User size={18} className="text-primary" /><span className="font-bold text-lg">{customer.name}</span></div>
+            <div className="flex items-center gap-2"><Car size={18} className="text-muted-foreground" /><span>{customer.vehicle_number}</span></div>
+            <div className="flex items-center gap-2"><Droplets size={18} className="text-destructive" /><span>Blood: {customer.blood_group}</span></div>
+            {customer.address && <div className="flex items-center gap-2"><MapPin size={18} className="text-muted-foreground" /><span>{customer.address}</span></div>}
           </CardContent>
         </Card>
       )}
 
       <Card className="card-shadow">
         <CardContent className="p-4 space-y-3">
-          <h2 className="font-bold text-lg flex items-center gap-2">
-            <Phone size={18} className="text-primary" /> Emergency Contacts
-          </h2>
+          <h2 className="font-bold text-lg flex items-center gap-2"><Phone size={18} className="text-primary" /> Emergency Contacts</h2>
           {contacts.map((contact: any, i: number) => (
             <div key={contact.id || i} className="flex items-center justify-between p-3 border rounded-lg">
               <div>
                 <div className="font-medium">{contact.name}</div>
                 <div className="text-sm text-muted-foreground">{contact.relationship}</div>
               </div>
-              <Button
-                onClick={() => callMutation.mutate({ phone: contact.phone, name: contact.name })}
-                disabled={callMutation.isPending}
-                className="emergency-gradient hover:opacity-90 text-primary-foreground"
-              >
+              <Button onClick={() => callMutation.mutate({ phone: contact.phone, name: contact.name })} disabled={callMutation.isPending} className="emergency-gradient hover:opacity-90 text-primary-foreground">
                 <Phone size={14} className="mr-1" /> Call
               </Button>
             </div>
@@ -287,56 +249,27 @@ ${imageUrl}
 
       <Card className="card-shadow border-blue-200 bg-blue-50">
         <CardContent className="p-4 space-y-3">
-          <h2 className="font-bold text-lg flex items-center gap-2">
-            <Camera size={18} className="text-blue-600" /> Accident Photo & Alert
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Photo lo → location automatically attach hogi → alert bhejo
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handlePhotoUpload}
-          />
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={photoUploading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            {photoUploading ? (
-              <><Loader2 size={16} className="animate-spin mr-2" /> Location + Photo le raha hai...</>
-            ) : (
-              <><Camera size={16} className="mr-2" /> 📸 Take Accident Photo</>
-            )}
+          <h2 className="font-bold text-lg flex items-center gap-2"><Camera size={18} className="text-blue-600" /> Accident Photo & Alert</h2>
+          <p className="text-sm text-muted-foreground">Photo lo → location + address attach hoga → alert bhejo</p>
+          <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
+          <Button onClick={() => fileInputRef.current?.click()} disabled={photoUploading} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+            {photoUploading ? <><Loader2 size={16} className="animate-spin mr-2" /> Location + Photo le raha hai...</> : <><Camera size={16} className="mr-2" /> 📸 Take Accident Photo</>}
           </Button>
-
           {photoUrl && (
             <div className="mt-2">
               <img src={photoUrl} alt="Accident" className="w-full rounded-lg border" />
-              <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                <CheckCircle2 size={12} /> Photo save ho gayi ✅
-              </p>
+              <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><CheckCircle2 size={12} /> Photo save ho gayi ✅</p>
             </div>
           )}
-
           {waMessage && contacts.length > 0 && (
             <div className="mt-3 space-y-2 border-t pt-3">
-              <p className="text-sm font-bold text-green-700 text-center">
-                👇 Har contact ko alert bhejo:
-              </p>
+              <p className="text-sm font-bold text-green-700 text-center">👇 Har contact ko alert bhejo:</p>
               {contacts.map((contact: any, i: number) => {
                 const phone = contact.phone.replace(/\D/g, "");
                 const indiaPhone = phone.startsWith("91") ? phone : `91${phone}`;
-                const waLink = `https://wa.me/${indiaPhone}?text=${encodeURIComponent(waMessage)}`;
                 return (
-                  <a key={i} href={waLink} target="_blank" rel="noopener noreferrer" className="block">
-                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
-                      <Send size={14} className="mr-2" />
-                      📲 {contact.name} ko Alert bhejo
-                    </Button>
+                  <a key={i} href={`https://wa.me/${indiaPhone}?text=${encodeURIComponent(waMessage)}`} target="_blank" rel="noopener noreferrer" className="block">
+                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white"><Send size={14} className="mr-2" />📲 {contact.name} ko Alert bhejo</Button>
                   </a>
                 );
               })}
@@ -354,10 +287,7 @@ ${imageUrl}
         </Card>
       )}
 
-      <Button
-        className="w-full emergency-gradient hover:opacity-90 text-primary-foreground"
-        onClick={() => callMutation.mutate({ phone: MASKED_CALL_NUMBER, name: "Helpline" })}
-      >
+      <Button className="w-full emergency-gradient hover:opacity-90 text-primary-foreground" onClick={() => callMutation.mutate({ phone: MASKED_CALL_NUMBER, name: "Helpline" })}>
         <Phone size={18} className="mr-2" /> Call Helpline ({MASKED_CALL_NUMBER})
       </Button>
 
@@ -365,22 +295,12 @@ ${imageUrl}
         <CardContent className="p-4">
           <h2 className="font-bold mb-3">Quick Emergency Numbers</h2>
           <div className="grid grid-cols-3 gap-2">
-            <Button variant="outline" className="flex flex-col h-16 border-red-200"
-              onClick={() => window.location.href = "tel:108"}>
-              <span className="text-lg">🚑</span><span className="text-xs">Ambulance 108</span>
-            </Button>
-            <Button variant="outline" className="flex flex-col h-16 border-blue-200"
-              onClick={() => window.location.href = "tel:100"}>
-              <span className="text-lg">🚔</span><span className="text-xs">Police 100</span>
-            </Button>
-            <Button variant="outline" className="flex flex-col h-16 border-orange-200"
-              onClick={() => window.location.href = "tel:101"}>
-              <span className="text-lg">🚒</span><span className="text-xs">Fire 101</span>
-            </Button>
+            <Button variant="outline" className="flex flex-col h-16 border-red-200" onClick={() => window.location.href = "tel:108"}><span className="text-lg">🚑</span><span className="text-xs">Ambulance 108</span></Button>
+            <Button variant="outline" className="flex flex-col h-16 border-blue-200" onClick={() => window.location.href = "tel:100"}><span className="text-lg">🚔</span><span className="text-xs">Police 100</span></Button>
+            <Button variant="outline" className="flex flex-col h-16 border-orange-200" onClick={() => window.location.href = "tel:101"}><span className="text-lg">🚒</span><span className="text-xs">Fire 101</span></Button>
           </div>
         </CardContent>
       </Card>
-
       <div className="h-4" />
     </div>
   );
