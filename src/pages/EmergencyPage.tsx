@@ -96,7 +96,6 @@ window.open(`https://wa.me/?text=${encodeURIComponent(message)}`);
     } catch (err) {
   console.log("UPLOAD ERROR:", err);
   toast.error("Photo upload failed");
-    }
     } finally {
       setPhotoUploading(false);
     }
