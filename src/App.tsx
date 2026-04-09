@@ -1,3 +1,4 @@
+import CustomerPanel from "./pages/CustomerPanel";
 import SalesmanPanel from "./pages/SalesmanPanel";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
