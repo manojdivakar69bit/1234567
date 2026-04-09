@@ -26,6 +26,7 @@ const CallStatusBanner = ({ status, name }: { status: "idle" | "connecting" | "s
 
 const EmergencyPage = () => {
   const { code } = useParams<{ code: string }>();
+   console.log("CODE:", code);
   const [callStatus, setCallStatus] = useState<{ status: "idle" | "connecting" | "success" | "error"; name: string }>({ status: "idle", name: "" });
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState(false);
