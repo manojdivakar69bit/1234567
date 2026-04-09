@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ScanLine, ArrowLeft, CheckCircle2, LogOut, IndianRupee, Users, Package } from "lucide-react";
+import { ScanLine, ArrowLeft, CheckCircle2, LogOut, IndianRupee, Users, Package, Trash2, Eraser, UserPlus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import QrScanner from "@/components/QrScanner";
 import EmergencyContactsForm, { type EmergencyContact } from "@/components/EmergencyContactsForm";
@@ -19,20 +19,29 @@ const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const AgentPanel = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  
+  // --- UI STATES ---
+  const [activeTab, setActiveTab] = useState<"register" | "payment" | "salesman">("register");
+  const [success, setSuccess] = useState(false);
+
+  // --- REGISTRATION STATES ---
   const [qrCodeInput, setQrCodeInput] = useState("");
   const [selectedQr, setSelectedQr] = useState<{ id: string; code: string } | null>(null);
   const [form, setForm] = useState({ name: "", vehicle_number: "", blood_group: "", address: "" });
   const [contacts, setContacts] = useState<EmergencyContact[]>([{ name: "", phone: "", relationship: "" }]);
-  const [success, setSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<"register" | "payment" | "salesman">("register");
+
+  // --- PAYMENT STATES ---
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentCustomerName, setPaymentCustomerName] = useState("");
-  const [assignSalesmanId, setAssignSalesmanId] = useState("");
+
+  // --- SALESMAN & QR STATES ---
   const [assignFrom, setAssignFrom] = useState("");
   const [assignTo, setAssignTo] = useState("");
+  const [assignSalesmanId, setAssignSalesmanId] = useState("");
   const [salesmanForm, setSalesmanForm] = useState({ name: "", email: "", password: "", phone: "" });
 
+  // 1. Get Current Agent
   const { data: currentAgent } = useQuery({
     queryKey: ["current_agent"],
     queryFn: async () => {
@@ -43,23 +52,15 @@ const AgentPanel = () => {
     },
   });
 
-  const { data: salesmen = [] } = useQuery({
-    queryKey: ["salesmen"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("salesmen").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: payments = [] } = useQuery({
-    queryKey: ["agent_payments", currentAgent?.id],
+  // 2. Fetch ONLY My Salesmen (Admin wale nahi dikhenge)
+  const { data: mySalesmen = [] } = useQuery({
+    queryKey: ["my_salesmen", currentAgent?.id],
     queryFn: async () => {
       if (!currentAgent?.id) return [];
       const { data, error } = await supabase
-        .from("payments")
+        .from("salesmen")
         .select("*")
-        .eq("collected_by_id", currentAgent.id)
+        .eq("created_by_agent_id", currentAgent.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -67,331 +68,259 @@ const AgentPanel = () => {
     enabled: !!currentAgent?.id,
   });
 
-  const addSalesmanMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("create-salesman", {
-        body: { ...salesmanForm, created_by_agent_id: currentAgent?.id },
-      });
+  // 3. Fetch Team Payments (For collection history)
+  const { data: teamPayments = [] } = useQuery({
+    queryKey: ["team_payments", currentAgent?.id],
+    queryFn: async () => {
+      if (!currentAgent?.id) return [];
+      const { data, error } = await supabase
+        .from("payments")
+        .select("*")
+        .or(`collected_by_id.eq.${currentAgent.id},agent_id.eq.${currentAgent.id}`)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      toast.success("Salesman created successfully!");
-      setSalesmanForm({ name: "", email: "", password: "", phone: "" });
-      queryClient.invalidateQueries({ queryKey: ["salesmen"] });
+    enabled: !!currentAgent?.id,
+  });
+
+  // --- MUTATIONS ---
+
+  const addSalesmanMutation = useMutation({
+    mutationFn: async () => {
+      await supabase.functions.invoke("create-salesman", {
+        body: { ...salesmanForm, created_by_agent_id: currentAgent?.id },
+      });
     },
-    onError: (e: any) => toast.error(e.message),
+    onSuccess: () => {
+      toast.success("Salesman added!");
+      setSalesmanForm({ name: "", email: "", password: "", phone: "" });
+      queryClient.invalidateQueries({ queryKey: ["my_salesmen"] });
+    }
+  });
+
+  const deleteSalesmanMutation = useMutation({
+    mutationFn: async (id: string) => await supabase.from("salesmen").delete().eq("id", id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my_salesmen"] });
+      toast.success("Salesman deleted");
+    }
+  });
+
+  const qrRangeActionMutation = useMutation({
+    mutationFn: async (action: "assign" | "unassign") => {
+      const from = assignFrom.toUpperCase();
+      const to = assignTo.toUpperCase();
+      const { data: rangeCodes } = await supabase.from("qr_codes").select("id").gte("code", from).lte("code", to).eq("assigned_agent_id", currentAgent?.id);
+      if (!rangeCodes?.length) throw new Error("No QR codes in your stock found for this range");
+      const ids = rangeCodes.map(q => q.id);
+      const update = action === "assign" ? { assigned_salesman_id: assignSalesmanId, status: "assigned" } : { assigned_salesman_id: null, status: "available" };
+      await supabase.from("qr_codes").update(update).in("id", ids);
+    },
+    onSuccess: () => {
+      toast.success("Stock updated!");
+      setAssignFrom(""); setAssignTo("");
+    },
+    onError: (e: any) => toast.error(e.message)
   });
 
   const lookupQr = useMutation({
     mutationFn: async (code: string) => {
-      const { data, error } = await supabase
-        .from("qr_codes")
-        .select("id, code, status, assigned_salesman_id")
-        .eq("code", code.trim().toUpperCase())
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) throw new Error("QR code not found");
-      if (data.status === "activated") throw new Error("QR code already activated");
+      const { data, error } = await supabase.from("qr_codes").select("*").eq("code", code.trim().toUpperCase()).maybeSingle();
+      if (error || !data) throw new Error("QR Not Found");
+      if (data.assigned_agent_id !== currentAgent?.id) throw new Error("Not in your stock");
+      if (data.status === "activated") throw new Error("Already active");
       return data;
     },
-    onSuccess: (data) => {
-      setSelectedQr(data);
-      toast.success(`QR code ${data.code} found`);
-    },
-    onError: (err: Error) => toast.error(err.message),
+    onSuccess: (data) => setSelectedQr(data),
+    onError: (e: any) => toast.error(e.message)
   });
 
   const registerMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedQr) throw new Error("No QR selected");
-      const validContacts = contacts.filter((c) => c.name && c.phone);
-      if (!validContacts.length) throw new Error("At least one emergency contact is required");
-
-      const { error: custError } = await supabase.from("customers").insert({
-        qr_code_id: selectedQr.id,
-        name: form.name,
-        vehicle_number: form.vehicle_number,
-        blood_group: form.blood_group,
-        address: form.address || null,
-      });
-      if (custError) throw custError;
-
-      const contactRows = validContacts.map((c) => ({
-        qr_code_id: selectedQr.id,
-        name: c.name,
-        phone: c.phone,
-        relationship: c.relationship || null,
-      }));
-      const { error: contactError } = await supabase.from("emergency_contacts").insert(contactRows);
-      if (contactError) throw contactError;
-
-      const { error: statusError } = await supabase.from("qr_codes").update({ status: "activated" }).eq("id", selectedQr.id);
-      if (statusError) throw statusError;
+      if (!selectedQr) return;
+      await supabase.from("customers").insert({ qr_code_id: selectedQr.id, ...form });
+      const contactRows = contacts.filter(c => c.name && c.phone).map(c => ({ qr_code_id: selectedQr.id, ...c }));
+      await supabase.from("emergency_contacts").insert(contactRows);
+      await supabase.from("qr_codes").update({ status: "activated" }).eq("id", selectedQr.id);
     },
-    onSuccess: () => {
-      setSuccess(true);
-      toast.success("Customer registered!");
-    },
-    onError: (err: Error) => toast.error(err.message),
+    onSuccess: () => setSuccess(true)
   });
 
   const { initiatePayment } = useRazorpayCheckout();
 
-  const savePayment = async (razorpayPaymentId?: string, razorpayOrderId?: string) => {
-    const { error } = await supabase.from("payments").insert({
-      amount: parseFloat(paymentAmount),
-      payment_method: paymentMethod,
-      status: "completed",
-      collected_by_role: "agent",
-      collected_by_id: currentAgent?.id,
-      customer_name: paymentCustomerName,
-      razorpay_payment_id: razorpayPaymentId || null,
-      razorpay_order_id: razorpayOrderId || null,
-    });
-    if (error) throw error;
-    queryClient.invalidateQueries({ queryKey: ["agent_payments"] });
-    setPaymentAmount("");
-    setPaymentCustomerName("");
-    setPaymentMethod("cash");
-    toast.success("Payment collected!");
+  const handleCollection = async () => {
+    if (paymentMethod === "razorpay") {
+      initiatePayment({
+        amount: parseFloat(paymentAmount),
+        customerName: paymentCustomerName,
+        agentAccountId: currentAgent?.razorpay_account_id,
+        onSuccess: () => toast.success("Online payment successful!")
+      });
+    } else {
+      await supabase.from("payments").insert({
+        amount: parseFloat(paymentAmount),
+        customer_name: paymentCustomerName,
+        payment_method: paymentMethod,
+        collected_by_id: currentAgent?.id,
+        collected_by_role: "agent",
+        collector_name: currentAgent?.name
+      });
+      toast.success("Cash/UPI recorded!");
+      setPaymentAmount(""); setPaymentCustomerName("");
+      queryClient.invalidateQueries({ queryKey: ["team_payments"] });
+    }
   };
 
-  const collectPaymentMutation = useMutation({
-    mutationFn: async () => {
-      if (!paymentAmount || !paymentCustomerName) throw new Error("Amount and customer name required");
-      if (paymentMethod === "razorpay") {
-        // ✅ Agent apna account ID pass karega — ₹5 seedha uske account mein
-        initiatePayment({
-          amount: parseFloat(paymentAmount),
-          customerName: paymentCustomerName,
-          agentAccountId: currentAgent?.razorpay_account_id || undefined,
-          onSuccess: async (paymentId, orderId) => {
-            await savePayment(paymentId, orderId);
-          },
-        });
-        return;
-      }
-      await savePayment();
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
+  const handleLogout = async () => { await supabase.auth.signOut(); navigate("/login"); };
 
-  const assignQrToSalesmanMutation = useMutation({
-    mutationFn: async () => {
-      if (!assignSalesmanId || !assignFrom || !assignTo) throw new Error("Missing fields");
-      const from = assignFrom.toUpperCase();
-      const to = assignTo.toUpperCase();
-      const { data: rangeCodes, error: fetchError } = await supabase
-        .from("qr_codes")
-        .select("id, code")
-        .gte("code", from)
-        .lte("code", to)
-        .in("status", ["available", "assigned"]);
-      if (fetchError) throw fetchError;
-      if (!rangeCodes || rangeCodes.length === 0) throw new Error("No QR codes in this range");
+  // --- RENDER ---
 
-      const ids = rangeCodes.map(q => q.id);
-      const { error } = await supabase
-        .from("qr_codes")
-        .update({ assigned_salesman_id: assignSalesmanId, status: "assigned" })
-        .in("id", ids);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
-      setAssignFrom(""); setAssignTo(""); setAssignSalesmanId("");
-      toast.success("QR codes assigned to salesman!");
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem("cmf_role");
-    localStorage.removeItem("cmf_email");
-    navigate("/login");
-  };
-
-  if (success && selectedQr) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md card-shadow text-center">
-          <CardContent className="p-6 space-y-4">
-            <CheckCircle2 className="mx-auto text-green-500" size={64} />
-            <h2 className="text-xl font-bold">Registration Complete!</h2>
-            <p className="text-muted-foreground">QR code {selectedQr.code} has been activated.</p>
-            <Button onClick={() => { setSuccess(false); setSelectedQr(null); setForm({ name: "", vehicle_number: "", blood_group: "", address: "" }); setContacts([{ name: "", phone: "", relationship: "" }]); setQrCodeInput(""); }} className="emergency-gradient hover:opacity-90 text-primary-foreground">
-              Register Another
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  if (success) return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <Card className="w-full max-w-md text-center p-8 space-y-4">
+        <CheckCircle2 className="mx-auto text-green-500" size={64} />
+        <h2 className="text-2xl font-bold">Activated!</h2>
+        <Button onClick={() => {setSuccess(false); setSelectedQr(null);}} className="w-full bg-blue-600 text-white">Next Registration</Button>
+      </Card>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-background p-4 max-w-lg mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Agent Panel</h1>
-        <Button variant="ghost" onClick={handleLogout}><LogOut size={18} className="mr-1" /> Logout</Button>
+    <div className="min-h-screen bg-slate-50 p-4 max-w-lg mx-auto space-y-6">
+      {/* HEADER */}
+      <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border">
+        <div>
+          <h1 className="text-xl font-black text-slate-800 tracking-tighter">AGENT PANEL</h1>
+          <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-700">{currentAgent?.name}</Badge>
+        </div>
+        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-red-500"><LogOut size={20}/></Button>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        <Button variant={activeTab === "register" ? "default" : "outline"} onClick={() => setActiveTab("register")} className={activeTab === "register" ? "emergency-gradient text-primary-foreground" : ""}>
-          <ScanLine size={16} className="mr-1" /> Register
-        </Button>
-        <Button variant={activeTab === "payment" ? "default" : "outline"} onClick={() => setActiveTab("payment")} className={activeTab === "payment" ? "emergency-gradient text-primary-foreground" : ""}>
-          <IndianRupee size={16} className="mr-1" /> Payment
-        </Button>
-        <Button variant={activeTab === "salesman" ? "default" : "outline"} onClick={() => setActiveTab("salesman")} className={activeTab === "salesman" ? "emergency-gradient text-primary-foreground" : ""}>
-          <Users size={16} className="mr-1" /> Salesman
-        </Button>
+      {/* TABS */}
+      <div className="flex gap-1 bg-slate-200 p-1 rounded-xl">
+        <Button size="sm" variant={activeTab === "register" ? "default" : "ghost"} onClick={() => setActiveTab("register")} className={`flex-1 ${activeTab === "register" ? "bg-white text-blue-700 shadow-sm" : ""}`}><ScanLine size={16} className="mr-1"/> Scan</Button>
+        <Button size="sm" variant={activeTab === "payment" ? "default" : "ghost"} onClick={() => setActiveTab("payment")} className={`flex-1 ${activeTab === "payment" ? "bg-white text-blue-700 shadow-sm" : ""}`}><IndianRupee size={16} className="mr-1"/> Cash</Button>
+        <Button size="sm" variant={activeTab === "salesman" ? "default" : "ghost"} onClick={() => setActiveTab("salesman")} className={`flex-1 ${activeTab === "salesman" ? "bg-white text-blue-700 shadow-sm" : ""}`}><Users size={16} className="mr-1"/> Team</Button>
       </div>
 
-      {/* Payment Tab */}
-      {activeTab === "payment" && (
-        <>
-          {/* ✅ Agent ka Razorpay account warning */}
-          {!currentAgent?.razorpay_account_id && (
-            <Card className="border-orange-200 bg-orange-50">
-              <CardContent className="p-3 text-sm text-orange-700">
-                ⚠️ Your Razorpay Linked Account ID is not set. Commission (₹5) will not be transferred automatically. Contact admin to set it up.
-              </CardContent>
-            </Card>
-          )}
-          <Card className="card-shadow">
-            <CardHeader><CardTitle className="flex items-center gap-2"><IndianRupee size={18} /> Collect Payment</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div><Label>Customer Name *</Label><Input value={paymentCustomerName} onChange={(e) => setPaymentCustomerName(e.target.value)} /></div>
-              <div><Label>Amount (₹) *</Label><Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} /></div>
-              <div>
-                <Label>Payment Method</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="upi">UPI</SelectItem>
-                    <SelectItem value="razorpay">Razorpay</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={() => collectPaymentMutation.mutate()} disabled={!paymentAmount || !paymentCustomerName || collectPaymentMutation.isPending} className="w-full emergency-gradient hover:opacity-90 text-primary-foreground">
-                {collectPaymentMutation.isPending ? "Processing..." : "Collect Payment"}
-              </Button>
-            </CardContent>
-          </Card>
-          {payments.length > 0 && (
-            <Card className="card-shadow">
-              <CardHeader><CardTitle>Payment History ({payments.length})</CardTitle></CardHeader>
-              <CardContent className="space-y-2 max-h-60 overflow-y-auto">
-                {payments.map((p: any) => (
-                  <div key={p.id} className="flex items-center justify-between p-2 border rounded">
-                    <div>
-                      <div className="font-medium">{p.customer_name}</div>
-                      <div className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString()}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold">₹{p.amount}</div>
-                      <Badge variant="secondary">{p.payment_method}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
-
-      {/* Salesman Tab */}
+      {/* TEAM MANAGEMENT TAB */}
       {activeTab === "salesman" && (
-        <>
-          <Card className="card-shadow mb-6">
-            <CardHeader><CardTitle>Create New Salesman</CardTitle></CardHeader>
+        <div className="space-y-4 animate-in fade-in">
+          <Card className="shadow-md border-none">
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-bold flex items-center gap-2"><UserPlus size={16}/> Register Salesman</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <Input placeholder="Salesman Name" value={salesmanForm.name} onChange={(e) => setSalesmanForm({...salesmanForm, name: e.target.value})} />
-              <Input placeholder="Email" value={salesmanForm.email} onChange={(e) => setSalesmanForm({...salesmanForm, email: e.target.value})} />
-              <Input type="password" placeholder="Password" value={salesmanForm.password} onChange={(e) => setSalesmanForm({...salesmanForm, password: e.target.value})} />
-              <Button onClick={() => addSalesmanMutation.mutate()} className="w-full emergency-gradient hover:opacity-90 text-primary-foreground" disabled={addSalesmanMutation.isPending}>
-                {addSalesmanMutation.isPending ? "Creating..." : "Add Salesman"}
-              </Button>
+              <Input placeholder="Salesman Name" value={salesmanForm.name} onChange={e=>setSalesmanForm({...salesmanForm, name: e.target.value})} />
+              <div className="grid grid-cols-2 gap-2">
+                <Input placeholder="Email" value={salesmanForm.email} onChange={e=>setSalesmanForm({...salesmanForm, email: e.target.value})} />
+                <Input type="password" placeholder="Password" value={salesmanForm.password} onChange={e=>setSalesmanForm({...salesmanForm, password: e.target.value})} />
+              </div>
+              <Button onClick={() => addSalesmanMutation.mutate()} className="w-full bg-blue-600 text-white font-bold">Create Team Member</Button>
             </CardContent>
           </Card>
-          <Card className="card-shadow">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Package size={18} /> Assign QR to Salesman</CardTitle></CardHeader>
+
+          <Card className="shadow-md border-none overflow-hidden">
+            <CardHeader className="bg-slate-800 text-white py-2"><CardTitle className="text-xs uppercase font-black">My Team ({mySalesmen.length})</CardTitle></CardHeader>
+            <div className="max-h-48 overflow-auto bg-white">
+              {mySalesmen.map((s: any) => (
+                <div key={s.id} className="p-3 border-b flex justify-between items-center">
+                  <div><div className="font-bold text-sm">{s.name}</div><div className="text-[10px] text-muted-foreground">{s.email}</div></div>
+                  <Button variant="ghost" size="sm" onClick={() => {if(confirm("Delete?")) deleteSalesmanMutation.mutate(s.id)}} className="text-red-400"><Trash2 size={16}/></Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="shadow-md border-none">
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-bold flex items-center gap-2"><Package size={16}/> Assign QR Stock</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="EMR-00001" value={assignFrom} onChange={(e) => setAssignFrom(e.target.value)} />
-                <Input placeholder="EMR-00010" value={assignTo} onChange={(e) => setAssignTo(e.target.value)} />
+              <div className="grid grid-cols-2 gap-2">
+                <Input placeholder="From EMR-001" value={assignFrom} onChange={e=>setAssignFrom(e.target.value)} />
+                <Input placeholder="To EMR-010" value={assignTo} onChange={e=>setAssignTo(e.target.value)} />
               </div>
               <Select value={assignSalesmanId} onValueChange={setAssignSalesmanId}>
                 <SelectTrigger><SelectValue placeholder="Select Salesman" /></SelectTrigger>
-                <SelectContent>
-                  {salesmen.filter((s: any) => s.status === "active").map((s: any) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectContent>{mySalesmen.map((s: any) => (<SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}</SelectContent>
               </Select>
-              <Button onClick={() => assignQrToSalesmanMutation.mutate()} disabled={!assignFrom || !assignTo || !assignSalesmanId} className="emergency-gradient hover:opacity-90 text-primary-foreground">Assign</Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button onClick={()=>qrRangeActionMutation.mutate("assign")} className="bg-green-600 text-white">Assign</Button>
+                <Button onClick={()=>qrRangeActionMutation.mutate("unassign")} variant="outline" className="text-red-500 border-red-200"><Eraser size={14} className="mr-1"/> Unassign</Button>
+              </div>
             </CardContent>
           </Card>
-          <Card className="card-shadow">
-            <CardHeader><CardTitle>Salesmen ({salesmen.length})</CardTitle></CardHeader>
-            <CardContent className="space-y-2 max-h-60 overflow-y-auto">
-              {salesmen.map((s: any) => (
-                <div key={s.id} className="flex items-center justify-between p-2 border rounded">
-                  <div>
-                    <div className="font-medium">{s.name}</div>
-                    <div className="text-xs text-muted-foreground">{s.email} • {s.phone || "No phone"}</div>
-                  </div>
-                  <Badge variant={s.status === "active" ? "default" : "secondary"}>{s.status}</Badge>
-                </div>
-              ))}
-              {salesmen.length === 0 && <p className="text-center text-muted-foreground text-sm py-4">No salesmen yet</p>}
-            </CardContent>
-          </Card>
-        </>
+        </div>
       )}
 
-      {/* Register Tab */}
-      {activeTab === "register" && (
-        <>
-          {!selectedQr ? (
-            <Card className="card-shadow">
-              <CardHeader><CardTitle className="flex items-center gap-2"><ScanLine size={18} /> Scan or Enter QR Code</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <QrScanner onScan={(code) => lookupQr.mutate(code)} />
-                <div className="flex gap-2">
-                  <Input placeholder="EMR-00001" value={qrCodeInput} onChange={(e) => setQrCodeInput(e.target.value)} />
-                  <Button onClick={() => lookupQr.mutate(qrCodeInput)} disabled={!qrCodeInput} className="emergency-gradient hover:opacity-90 text-primary-foreground">Lookup</Button>
+      {/* COLLECTION TAB */}
+      {activeTab === "payment" && (
+        <div className="space-y-4 animate-in fade-in">
+          <Card className="shadow-md border-none">
+            <CardHeader><CardTitle className="text-sm font-bold">New Payment</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <Input placeholder="Customer Name" value={paymentCustomerName} onChange={e=>setPaymentCustomerName(e.target.value)} />
+              <div className="flex gap-2">
+                <Input type="number" placeholder="Amount" value={paymentAmount} onChange={e=>setPaymentAmount(e.target.value)} />
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="cash">Cash</SelectItem><SelectItem value="upi">UPI</SelectItem><SelectItem value="razorpay">Online</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleCollection} className="w-full bg-green-600 text-white font-bold">Submit Collection</Button>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-md border-none overflow-hidden">
+            <CardHeader className="bg-green-700 text-white py-2 flex flex-row justify-between items-center">
+              <CardTitle className="text-xs uppercase font-bold">Team Revenue</CardTitle>
+              <span className="font-black">₹{teamPayments.reduce((s,p)=>s+Number(p.amount),0)}</span>
+            </CardHeader>
+            <div className="max-h-60 overflow-auto bg-white">
+              {teamPayments.map((p: any) => (
+                <div key={p.id} className="p-3 border-b flex justify-between items-center">
+                  <div><div className="font-bold text-xs">{p.customer_name}</div><div className="text-[9px] text-muted-foreground">By {p.collector_name} ({p.collected_by_role})</div></div>
+                  <div className="font-black text-blue-600">₹{p.amount}</div>
                 </div>
-              </CardContent>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* REGISTRATION TAB */}
+      {activeTab === "register" && (
+        <div className="space-y-4 animate-in fade-in">
+          {!selectedQr ? (
+            <Card className="p-4 shadow-md border-none space-y-4">
+              <QrScanner onScan={(code) => lookupQr.mutate(code)} />
+              <div className="flex gap-2">
+                <Input placeholder="EMR-00001" value={qrCodeInput} onChange={e=>setQrCodeInput(e.target.value)} />
+                <Button onClick={()=>lookupQr.mutate(qrCodeInput)} className="bg-blue-600 text-white">Find</Button>
+              </div>
             </Card>
           ) : (
-            <Card className="card-shadow">
-              <CardHeader><CardTitle>Register Customer — {selectedQr.code}</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div><Label>Full Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-                <div><Label>Vehicle Number *</Label><Input value={form.vehicle_number} onChange={(e) => setForm({ ...form, vehicle_number: e.target.value })} /></div>
-                <div>
-                  <Label>Blood Group *</Label>
-                  <Select value={form.blood_group} onValueChange={(v) => setForm({ ...form, blood_group: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>{BLOOD_GROUPS.map((bg) => (<SelectItem key={bg} value={bg}>{bg}</SelectItem>))}</SelectContent>
-                  </Select>
+            <Card className="shadow-md border-none">
+              <CardHeader className="bg-blue-600 text-white py-2"><CardTitle className="text-sm">Register: {selectedQr.code}</CardTitle></CardHeader>
+              <CardContent className="p-4 space-y-4">
+                <div className="space-y-2">
+                  <Label>Customer Details</Label>
+                  <Input placeholder="Name" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input placeholder="Vehicle No" value={form.vehicle_number} onChange={e=>setForm({...form, vehicle_number:e.target.value})} />
+                    <Select value={form.blood_group} onValueChange={v=>setForm({...form, blood_group:v})}>
+                      <SelectTrigger><SelectValue placeholder="Blood" /></SelectTrigger>
+                      <SelectContent>{BLOOD_GROUPS.map(bg => <SelectItem key={bg} value={bg}>{bg}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div><Label>Address</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
                 <EmergencyContactsForm contacts={contacts} onChange={setContacts} />
-                <Button onClick={() => registerMutation.mutate()} disabled={!form.name || !form.vehicle_number || !form.blood_group || registerMutation.isPending} className="w-full emergency-gradient hover:opacity-90 text-primary-foreground">
-                  {registerMutation.isPending ? "Registering..." : "Register & Activate"}
-                </Button>
+                <Button onClick={()=>registerMutation.mutate()} className="w-full bg-blue-600 text-white font-bold h-12 shadow-lg">ACTIVATE QR</Button>
               </CardContent>
             </Card>
           )}
-        </>
+        </div>
       )}
 
-      <Button asChild variant="ghost" className="w-full"><Link to="/"><ArrowLeft className="mr-2" size={16} />Back</Link></Button>
+      <Button asChild variant="ghost" className="w-full text-slate-400 text-xs"><Link to="/"><ArrowLeft size={14} className="mr-1" /> Back to Home</Link></Button>
     </div>
   );
 };
