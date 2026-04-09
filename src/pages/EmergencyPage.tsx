@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query"; // ✅ FIXED: single import
 import { useParams } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,8 @@ const CallStatusBanner = ({ status, name }: { status: "idle" | "connecting" | "s
 
 const EmergencyPage = () => {
   const { code } = useParams<{ code: string }>();
-   console.log("CODE:", code);
+  console.log("CODE:", code);
+
   const [callStatus, setCallStatus] = useState<{ status: "idle" | "connecting" | "success" | "error"; name: string }>({ status: "idle", name: "" });
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState(false);
@@ -35,16 +36,30 @@ const EmergencyPage = () => {
   const [reportSaved, setReportSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-capture location on page load
-    useEffect(() => {
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+  // ✅ FIXED: callMutation defined here
+  const callMutation = useMutation({
+    mutationFn: async ({ phone, name }: { phone: string; name: string }) => {
+      setCallStatus({ status: "connecting", name });
+      await new Promise((res) => setTimeout(res, 800));
+      window.location.href = `tel:${phone}`;
+      setCallStatus({ status: "success", name });
     },
-    () => setLocationError(true)
-  );
-}, []); 
-  // Save scan report to Supabase 
+    onError: (_: any, variables: { phone: string; name: string }) => {
+      setCallStatus({ status: "error", name: variables.name });
+    },
+  });
+
+  // Auto-capture location on page load
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      () => setLocationError(true)
+    );
+  }, []);
+
+  // Save scan report to Supabase
   const saveScanReport = async (lat?: number, lng?: number, photo?: string) => {
     if (reportSaved) return;
     const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : null;
@@ -58,82 +73,44 @@ const EmergencyPage = () => {
 
   // Auto save report when location is captured
   useEffect(() => {
-  if (location) {
-    saveScanReport(location.lat, location.lng);
-  }
-}, [location]);
+    if (location) {
+      saveScanReport(location.lat, location.lng);
+    }
+  }, [location]);
 
   // Photo upload handler
- const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "accident_upload");
 
-  setPhotoUploading(true);
-
-  try {
-    // 👉 Cloudinary upload
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", "accident_upload"); // 👈 yaha tera preset name
-
-    const res = await fetch(
-      "https://api.cloudinary.com/v1_1/dyhgfp2kp/image/upload", // 👈 yaha tera cloud name
-      {
+      const res = await fetch("https://api.cloudinary.com/v1_1/dyhgfp2kp/image/upload", {
         method: "POST",
         body: formData,
-      }
-    );
+      });
+      const data = await res.json();
+      if (!data.secure_url) throw new Error("Upload failed");
 
-    const data = await res.json();
+      const imageUrl = data.secure_url;
+      setPhotoUrl(imageUrl);
+      await saveScanReport(location?.lat, location?.lng, imageUrl);
+      toast.success("Photo uploaded successfully!");
 
-    if (!data.secure_url) {
-      throw new Error("Upload failed");
+      const message = `🚨 ACCIDENT ALERT!\n\n📍 Location:\nhttps://maps.google.com/?q=${location?.lat},${location?.lng}\n\n🕐 Time:\n${new Date().toLocaleString("en-IN")}\n\n📸 Photo:\n${imageUrl}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`);
+    } catch (err) {
+      console.log("UPLOAD ERROR:", err);
+      toast.error("Photo upload failed");
+    } finally {
+      setPhotoUploading(false);
     }
+  };
 
-    const imageUrl = data.secure_url;
-
-    // 👉 UI me photo dikhegi
-    setPhotoUrl(imageUrl);
-
-    // 👉 DB save (optional but recommended)
-    await saveScanReport(location?.lat, location?.lng, imageUrl);
-
-    // 👉 success message
-    toast.success("Photo uploaded successfully!");
-
-    // 👉 WhatsApp message
-    const message = `🚨 ACCIDENT ALERT!
-
-📍 Location:
-https://maps.google.com/?q=${location?.lat},${location?.lng}
-
-🕐 Time:
-${new Date().toLocaleString("en-IN")}
-
-📸 Photo:
-${imageUrl}
-`;
-
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`);
-
-  } catch (err) {
-    console.log("UPLOAD ERROR:", err);
-    toast.error("Photo upload failed");
-  } finally {
-    setPhotoUploading(false);
-  }
-};
-    const { data, isLoading, error } = useQuery({
-      const callMutation = useMutation({
-  mutationFn: async ({ phone, name }: { phone: string; name: string }) => {
-    setCallStatus({ status: "connecting", name });
-    window.location.href = `tel:${phone}`;
-    setCallStatus({ status: "success", name });
-  },
-  onError: (_, variables) => {
-    setCallStatus({ status: "error", name: variables.name });
-  },
-});
+  const { data, isLoading, error } = useQuery({
     queryKey: ["emergency", code],
     queryFn: async () => {
       const { data: qr, error: qrError } = await supabase
