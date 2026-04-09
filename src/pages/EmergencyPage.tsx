@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query"; // ✅ FIXED: single import
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,7 +36,6 @@ const EmergencyPage = () => {
   const [reportSaved, setReportSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ✅ FIXED: callMutation defined here
   const callMutation = useMutation({
     mutationFn: async ({ phone, name }: { phone: string; name: string }) => {
       setCallStatus({ status: "connecting", name });
@@ -49,72 +48,13 @@ const EmergencyPage = () => {
     },
   });
 
-  // Auto-capture location on page load
+  // Auto-capture location
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      },
+      (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => setLocationError(true)
     );
   }, []);
-
-  // Save scan report to Supabase
-  const saveScanReport = async (lat?: number, lng?: number, photo?: string) => {
-    if (reportSaved) return;
-    const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : null;
-    await supabase.from("call_logs").insert({
-      qr_code: code || "",
-      status: "scanned",
-      caller_info: { latitude: lat || null, longitude: lng || null, photo_url: photo || null, maps_link: mapsLink } as any,
-    });
-    setReportSaved(true);
-  };
-
-  // Auto save report when location is captured
-  useEffect(() => {
-    if (location) {
-      saveScanReport(location.lat, location.lng);
-    }
-  }, [location]);
-
-  // Photo upload handler
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("upload_preset", "accident_upload");
-
-      const res = await fetch("https://api.cloudinary.com/v1_1/dyhgfp2kp/image/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (!data.secure_url) throw new Error("Upload failed");
-
-      const imageUrl = data.secure_url;
-      setPhotoUrl(imageUrl);
-      await saveScanReport(location?.lat, location?.lng, imageUrl);
-      toast.success("Photo uploaded successfully!");
-
-      const message = `🚨 ACCIDENT ALERT!\n\n📍 Location:\nhttps://maps.google.com/?q=${location?.lat},${location?.lng}\n\n🕐 Time:\n${new Date().toLocaleString("en-IN")}\n\n📸 Photo:\n${imageUrl}`;
-      const waMessage = `🚨 ACCIDENT ALERT!\n\n📍 Location:\nhttps://maps.google.com/?q=${location?.lat},${location?.lng}\n\n🕐 Time: ${new Date().toLocaleString("en-IN")}\n\n📸 Photo:\n${imageUrl}`;
-
-data?.contacts?.forEach((contact: any) => {
-  const phone = contact.phone.replace(/\D/g, "");
-  const indiaPhone = phone.startsWith("91") ? phone : `91${phone}`;
-  window.open(`https://wa.me/${indiaPhone}?text=${encodeURIComponent(waMessage)}`);
-});
-    } catch (err) {
-      console.log("UPLOAD ERROR:", err);
-      toast.error("Photo upload failed");
-    } finally {
-      setPhotoUploading(false);
-    }
-  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["emergency", code],
@@ -139,6 +79,90 @@ data?.contacts?.forEach((contact: any) => {
     },
     enabled: !!code,
   });
+
+  // Save scan report
+  const saveScanReport = async (lat?: number, lng?: number, photo?: string) => {
+    if (reportSaved) return;
+    const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : null;
+    await supabase.from("call_logs").insert({
+      qr_code: code || "",
+      status: "scanned",
+      caller_info: { latitude: lat || null, longitude: lng || null, photo_url: photo || null, maps_link: mapsLink } as any,
+    });
+    setReportSaved(true);
+  };
+
+  useEffect(() => {
+    if (location) saveScanReport(location.lat, location.lng);
+  }, [location]);
+
+  // ✅ FIXED: Photo upload + WhatsApp alert to all contacts
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "accident_upload");
+
+      const res = await fetch("https://api.cloudinary.com/v1_1/dyhgfp2kp/image/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await res.json();
+      if (!uploadData.secure_url) throw new Error("Upload failed");
+
+      const imageUrl = uploadData.secure_url;
+      setPhotoUrl(imageUrl);
+      await saveScanReport(location?.lat, location?.lng, imageUrl);
+      toast.success("Photo upload ho gayi! WhatsApp alerts ja rahe hain...");
+
+      // ✅ WhatsApp message with all details
+      const waMessage = `🚨 *ACCIDENT ALERT!*
+
+👤 *${data?.customer?.name || "Unknown"}*
+🚗 *${data?.customer?.vehicle_number || ""}*
+🩸 *Blood: ${data?.customer?.blood_group || ""}*
+
+📍 *Location:*
+https://maps.google.com/?q=${location?.lat},${location?.lng}
+
+🕐 *Time:* ${new Date().toLocaleString("en-IN")}
+
+📸 *Accident Photo:*
+${imageUrl}
+
+⚠️ Turant madad karein!`;
+
+      // ✅ Pehle contact ko turant bhejo
+      const contacts = data?.contacts || [];
+      console.log("Contacts:", contacts); // debug ke liye
+
+      if (contacts.length > 0) {
+        const first = contacts[0];
+        const phone1 = first.phone.replace(/\D/g, "");
+        const indiaPhone1 = phone1.startsWith("91") ? phone1 : `91${phone1}`;
+        window.open(`https://wa.me/${indiaPhone1}?text=${encodeURIComponent(waMessage)}`, "_blank");
+      }
+
+      // ✅ Baaki contacts ko delay se bhejo (browser popup block se bachne ke liye)
+      contacts.slice(1).forEach((contact: any, index: number) => {
+        setTimeout(() => {
+          const phone = contact.phone.replace(/\D/g, "");
+          const indiaPhone = phone.startsWith("91") ? phone : `91${phone}`;
+          window.open(`https://wa.me/${indiaPhone}?text=${encodeURIComponent(waMessage)}`, "_blank");
+        }, (index + 1) * 2000);
+      });
+
+    } catch (err) {
+      console.log("UPLOAD ERROR:", err);
+      toast.error("Photo upload failed");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -175,7 +199,7 @@ data?.contacts?.forEach((contact: any) => {
         <p className="text-muted-foreground">QR Code: {code}</p>
       </div>
 
-      {/* Timestamp + Location Bar */}
+      {/* Timestamp + Location */}
       <Card className="card-shadow border-orange-200 bg-orange-50">
         <CardContent className="p-3 space-y-1">
           <div className="flex items-center gap-2 text-sm">
@@ -258,7 +282,7 @@ data?.contacts?.forEach((contact: any) => {
             <Camera size={18} className="text-blue-600" /> Accident Photo
           </h2>
           <p className="text-sm text-muted-foreground">
-            Photo lene se owner ki family ko immediately alert milega
+            Photo lene se owner ki family ko immediately WhatsApp alert milega
           </p>
           <input
             ref={fileInputRef}
@@ -283,7 +307,7 @@ data?.contacts?.forEach((contact: any) => {
             <div className="mt-2">
               <img src={photoUrl} alt="Accident" className="w-full rounded-lg border" />
               <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                <CheckCircle2 size={12} /> Photo saved successfully
+                <CheckCircle2 size={12} /> Photo saved & WhatsApp alert bheja gaya ✅
               </p>
             </div>
           )}
