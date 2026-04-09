@@ -144,7 +144,8 @@ const EmergencyPage = () => {
         : `📍 *Location:* GPS unavailable\n🏠 *Address:* ${data?.customer?.address || "N/A"}`;
 
       const msg =
-`🚨 *ACCIDENT ALERT!*
+`🚨 *ACCIDENT ALERT FROM CALL MY FAMILY!*
+ 🌎 callmyfamily.in
 
 👤 *Name:* ${data?.customer?.name || "Unknown"}
 🚗 *Vehicle:* ${data?.customer?.vehicle_number || "N/A"}
