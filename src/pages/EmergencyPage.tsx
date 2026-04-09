@@ -122,7 +122,7 @@ ${imageUrl}
     setPhotoUploading(false);
   }
 };
-    query({
+    const { data, isLoading, error } = useQuery({
     queryKey: ["emergency", code],
     queryFn: async () => {
       const { data: qr, error: qrError } = await supabase
