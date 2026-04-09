@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,16 +35,15 @@ const EmergencyPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-capture location on page load
-  useState(() => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      },
-      () => setLocationError(true)
-    );
-  });
-
-  // Save scan report to Supabase
+    useEffect(() => {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    },
+    () => setLocationError(true)
+  );
+}, []); 
+  // Save scan report to Supabase 
   const saveScanReport = async (lat?: number, lng?: number, photo?: string) => {
     if (reportSaved) return;
     const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : null;
