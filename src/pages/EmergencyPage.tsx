@@ -24,6 +24,18 @@ const CallStatusBanner = ({ status, name }: { status: "idle" | "connecting" | "s
   );
 };
 
+// ✅ Location ko Promise se fresh fetch karo
+const getFreshLocation = (): Promise<{ lat: number; lng: number } | null> => {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
+};
+
 const EmergencyPage = () => {
   const { code } = useParams<{ code: string }>();
 
@@ -35,6 +47,10 @@ const EmergencyPage = () => {
   const [reportSaved, setReportSaved] = useState(false);
   const [waMessage, setWaMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Location ref — hamesha latest value milegi async functions mein
+  const locationRef = useRef<{ lat: number; lng: number } | null>(null);
+  useEffect(() => { locationRef.current = location; }, [location]);
 
   const callMutation = useMutation({
     mutationFn: async ({ phone, name }: { phone: string; name: string }) => {
@@ -48,25 +64,12 @@ const EmergencyPage = () => {
     },
   });
 
-  // ✅ Location — HIGH accuracy + timeout
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setLocationError(true);
-      return;
-    }
+    if (!navigator.geolocation) { setLocationError(true); return; }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      },
-      (err) => {
-        console.log("Location error:", err.code, err.message);
-        setLocationError(true);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      }
+      (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => setLocationError(true),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }, []);
 
@@ -81,14 +84,9 @@ const EmergencyPage = () => {
       if (qrError) throw qrError;
       if (!qr) throw new Error("QR code not found");
       const { data: customer } = await supabase
-        .from("customers")
-        .select("*")
-        .eq("qr_code_id", qr.id)
-        .maybeSingle();
+        .from("customers").select("*").eq("qr_code_id", qr.id).maybeSingle();
       const { data: contacts } = await supabase
-        .from("emergency_contacts")
-        .select("*")
-        .eq("qr_code_id", qr.id);
+        .from("emergency_contacts").select("*").eq("qr_code_id", qr.id);
       return { qr, customer, contacts: contacts || [] };
     },
     enabled: !!code,
@@ -96,7 +94,7 @@ const EmergencyPage = () => {
 
   const saveScanReport = async (lat?: number, lng?: number, photo?: string) => {
     if (reportSaved) return;
-    const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : null;
+    const mapsLink = lat && lng ? `https://www.google.com/maps?q=${lat},${lng}` : null;
     await supabase.from("call_logs").insert({
       qr_code: code || "",
       status: "scanned",
@@ -113,8 +111,17 @@ const EmergencyPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoUploading(true);
+    toast("📍 Location fetch ho rahi hai...");
 
     try {
+      // ✅ FRESH location lo — state pe depend mat karo
+      let currentLocation = locationRef.current;
+      if (!currentLocation) {
+        currentLocation = await getFreshLocation();
+        if (currentLocation) setLocation(currentLocation);
+      }
+
+      // Photo upload
       const formData = new FormData();
       formData.append("file", file);
       formData.append("upload_preset", "accident_upload");
@@ -128,14 +135,13 @@ const EmergencyPage = () => {
 
       const imageUrl = uploadData.secure_url;
       setPhotoUrl(imageUrl);
-      await saveScanReport(location?.lat, location?.lng, imageUrl);
+      await saveScanReport(currentLocation?.lat, currentLocation?.lng, imageUrl);
 
-      // ✅ Location sahi format mein
-      const locationLine = location
-        ? `📍 *Location (Maps):*\nhttps://www.google.com/maps?q=${location.lat},${location.lng}`
-        : `📍 *Location:* GPS available nahi tha`;
+      // ✅ Location line — sahi coordinates ya clear message
+      const locationLine = currentLocation
+        ? `📍 *Location (Google Maps):*\nhttps://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`
+        : `📍 *Location:* GPS nahi mila — scanner ka pata:\n${data?.customer?.address || "N/A"}`;
 
-      // ✅ Photo alag line pe — WhatsApp mein clickable hogi
       const msg =
 `🚨 *ACCIDENT ALERT!*
 
@@ -148,13 +154,13 @@ ${locationLine}
 
 🕐 *Samay:* ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
 
-📸 *Accident ki Photo:*
+📸 *Accident ki Photo (tap karke dekho):*
 ${imageUrl}
 
 ⚠️ *Kripya turant madad karein!*`;
 
       setWaMessage(msg);
-      toast.success("Photo upload ho gayi! Neeche se alert bhejo 👇");
+      toast.success("✅ Photo ready! Neeche se alert bhejo 👇");
 
     } catch (err) {
       console.log("UPLOAD ERROR:", err);
@@ -198,7 +204,6 @@ ${imageUrl}
         <p className="text-muted-foreground">QR Code: {code}</p>
       </div>
 
-      {/* Location Banner */}
       <Card className="card-shadow border-orange-200 bg-orange-50">
         <CardContent className="p-3 space-y-1">
           <div className="flex items-center gap-2 text-sm">
@@ -209,11 +214,11 @@ ${imageUrl}
             <MapPin size={14} className="text-primary" />
             {location ? (
               <a href={mapsLink!} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-medium">
-                📍 View Live Location on Maps
+                📍 Live Location dekho Maps pe
               </a>
             ) : locationError ? (
               <span className="text-red-500 text-xs font-medium">
-                ⚠️ Location nahi mili — Phone ka GPS ON karo aur page reload karo
+                ⚠️ GPS band hai — Settings mein Location ON karo
               </span>
             ) : (
               <span className="text-muted-foreground flex items-center gap-1">
@@ -221,14 +226,10 @@ ${imageUrl}
               </span>
             )}
           </div>
-          {/* ✅ GPS ON karne ka button */}
           {locationError && (
-            <Button
-              size="sm"
-              className="w-full mt-1 bg-orange-500 hover:bg-orange-600 text-white text-xs"
-              onClick={() => window.location.reload()}
-            >
-              🔄 GPS ON karke Reload karo
+            <Button size="sm" className="w-full mt-1 bg-orange-500 hover:bg-orange-600 text-white text-xs"
+              onClick={() => window.location.reload()}>
+              🔄 Reload karo
             </Button>
           )}
         </CardContent>
@@ -284,14 +285,13 @@ ${imageUrl}
         </CardContent>
       </Card>
 
-      {/* Accident Photo + WhatsApp Alert */}
       <Card className="card-shadow border-blue-200 bg-blue-50">
         <CardContent className="p-4 space-y-3">
           <h2 className="font-bold text-lg flex items-center gap-2">
             <Camera size={18} className="text-blue-600" /> Accident Photo & Alert
           </h2>
           <p className="text-sm text-muted-foreground">
-            Photo lo → sabko WhatsApp alert bhejo
+            Photo lo → location automatically attach hogi → alert bhejo
           </p>
           <input
             ref={fileInputRef}
@@ -307,7 +307,7 @@ ${imageUrl}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white"
           >
             {photoUploading ? (
-              <><Loader2 size={16} className="animate-spin mr-2" /> Uploading...</>
+              <><Loader2 size={16} className="animate-spin mr-2" /> Location + Photo le raha hai...</>
             ) : (
               <><Camera size={16} className="mr-2" /> 📸 Take Accident Photo</>
             )}
@@ -322,7 +322,6 @@ ${imageUrl}
             </div>
           )}
 
-          {/* ✅ WhatsApp Alert Buttons */}
           {waMessage && contacts.length > 0 && (
             <div className="mt-3 space-y-2 border-t pt-3">
               <p className="text-sm font-bold text-green-700 text-center">
@@ -368,18 +367,15 @@ ${imageUrl}
           <div className="grid grid-cols-3 gap-2">
             <Button variant="outline" className="flex flex-col h-16 border-red-200"
               onClick={() => window.location.href = "tel:108"}>
-              <span className="text-lg">🚑</span>
-              <span className="text-xs">Ambulance 108</span>
+              <span className="text-lg">🚑</span><span className="text-xs">Ambulance 108</span>
             </Button>
             <Button variant="outline" className="flex flex-col h-16 border-blue-200"
               onClick={() => window.location.href = "tel:100"}>
-              <span className="text-lg">🚔</span>
-              <span className="text-xs">Police 100</span>
+              <span className="text-lg">🚔</span><span className="text-xs">Police 100</span>
             </Button>
             <Button variant="outline" className="flex flex-col h-16 border-orange-200"
               onClick={() => window.location.href = "tel:101"}>
-              <span className="text-lg">🚒</span>
-              <span className="text-xs">Fire 101</span>
+              <span className="text-lg">🚒</span><span className="text-xs">Fire 101</span>
             </Button>
           </div>
         </CardContent>
