@@ -39,6 +39,21 @@ const SalesmanPanel = () => {
     },
   });
 
+  // ✅ Salesman ke agent ka data fetch karo (uska commission bhi chahiye)
+  const { data: salesmanAgent } = useQuery({
+    queryKey: ["salesman_agent", currentSalesman?.created_by_agent_id],
+    queryFn: async () => {
+      if (!currentSalesman?.created_by_agent_id) return null;
+      const { data } = await supabase
+        .from("agents")
+        .select("razorpay_account_id")
+        .eq("id", currentSalesman.created_by_agent_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!currentSalesman?.created_by_agent_id,
+  });
+
   const { data: payments = [] } = useQuery({
     queryKey: ["salesman_payments", currentSalesman?.id],
     queryFn: async () => {
@@ -132,9 +147,12 @@ const SalesmanPanel = () => {
     mutationFn: async () => {
       if (!paymentAmount || !paymentCustomerName) throw new Error("Amount and customer name required");
       if (paymentMethod === "razorpay") {
+        // ✅ Salesman + Agent dono ka account pass karo
         initiatePayment({
           amount: parseFloat(paymentAmount),
           customerName: paymentCustomerName,
+          salesmanAccountId: currentSalesman?.razorpay_account_id || undefined, // ₹15
+          agentAccountId: salesmanAgent?.razorpay_account_id || undefined,       // ₹5
           onSuccess: async (paymentId, orderId) => {
             await savePayment(paymentId, orderId);
           },
@@ -172,13 +190,10 @@ const SalesmanPanel = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-lg mx-auto space-y-6">
-
-      {/* Logo */}
       <div className="flex justify-center pt-2">
         <img src="/logo.png" alt="Call My Family" className="w-40 h-40 object-contain" />
       </div>
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Salesman Panel</h1>
@@ -187,7 +202,6 @@ const SalesmanPanel = () => {
         <Button variant="ghost" onClick={handleLogout}><LogOut size={18} className="mr-1" /> Logout</Button>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2">
         <Button variant={activeTab === "register" ? "default" : "outline"} onClick={() => setActiveTab("register")} className={activeTab === "register" ? "emergency-gradient text-primary-foreground" : ""}>
           <ScanLine size={16} className="mr-1" /> Register
@@ -200,6 +214,21 @@ const SalesmanPanel = () => {
       {/* Payment Tab */}
       {activeTab === "payment" && (
         <>
+          {/* ✅ Commission info */}
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="p-3 text-sm text-green-700">
+              💰 Per QR sale: You earn <strong>₹15</strong> automatically in your account.
+            </CardContent>
+          </Card>
+
+          {!currentSalesman?.razorpay_account_id && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="p-3 text-sm text-orange-700">
+                ⚠️ Your Razorpay Linked Account ID is not set. Commission (₹15) will not be transferred automatically. Contact your agent to set it up.
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="card-shadow">
             <CardHeader><CardTitle className="flex items-center gap-2"><IndianRupee size={18} /> Collect Payment</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -221,6 +250,7 @@ const SalesmanPanel = () => {
               </Button>
             </CardContent>
           </Card>
+
           {payments.length > 0 && (
             <Card className="card-shadow">
               <CardHeader><CardTitle>Payment History ({payments.length})</CardTitle></CardHeader>
