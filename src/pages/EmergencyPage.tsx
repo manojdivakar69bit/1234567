@@ -124,6 +124,16 @@ ${imageUrl}
   }
 };
     const { data, isLoading, error } = useQuery({
+      const callMutation = useMutation({
+  mutationFn: async ({ phone, name }: { phone: string; name: string }) => {
+    setCallStatus({ status: "connecting", name });
+    window.location.href = `tel:${phone}`;
+    setCallStatus({ status: "success", name });
+  },
+  onError: (_, variables) => {
+    setCallStatus({ status: "error", name: variables.name });
+  },
+});
     queryKey: ["emergency", code],
     queryFn: async () => {
       const { data: qr, error: qrError } = await supabase
