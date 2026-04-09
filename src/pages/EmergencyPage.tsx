@@ -128,7 +128,7 @@ ${imageUrl}
       const { data: qr, error: qrError } = await supabase
         .from("qr_codes")
         .select("id, code, status")
-        .eq("code", code!)
+        .eq("code", code)
         .maybeSingle();
       if (qrError) throw qrError;
       if (!qr) throw new Error("QR code not found");
