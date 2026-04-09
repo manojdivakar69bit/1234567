@@ -33,7 +33,7 @@ const EmergencyPage = () => {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [reportSaved, setReportSaved] = useState(false);
-  const [waMessage, setWaMessage] = useState<string | null>(null); // ✅ WhatsApp message store
+  const [waMessage, setWaMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const callMutation = useMutation({
@@ -48,10 +48,25 @@ const EmergencyPage = () => {
     },
   });
 
+  // ✅ Location — HIGH accuracy + timeout
   useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationError(true);
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
-      (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setLocationError(true)
+      (pos) => {
+        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      (err) => {
+        console.log("Location error:", err.code, err.message);
+        setLocationError(true);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
     );
   }, []);
 
@@ -115,25 +130,31 @@ const EmergencyPage = () => {
       setPhotoUrl(imageUrl);
       await saveScanReport(location?.lat, location?.lng, imageUrl);
 
-      // ✅ Message taiyar karo aur state mein save karo
-      const msg = `🚨 *ACCIDENT ALERT!*
+      // ✅ Location sahi format mein
+      const locationLine = location
+        ? `📍 *Location (Maps):*\nhttps://www.google.com/maps?q=${location.lat},${location.lng}`
+        : `📍 *Location:* GPS available nahi tha`;
 
-👤 *${data?.customer?.name || "Unknown"}*
-🚗 *${data?.customer?.vehicle_number || ""}*
-🩸 *Blood: ${data?.customer?.blood_group || ""}*
+      // ✅ Photo alag line pe — WhatsApp mein clickable hogi
+      const msg =
+`🚨 *ACCIDENT ALERT!*
 
-📍 *Location:*
-https://maps.google.com/?q=${location?.lat},${location?.lng}
+👤 *Naam:* ${data?.customer?.name || "Unknown"}
+🚗 *Gaadi:* ${data?.customer?.vehicle_number || "N/A"}
+🩸 *Blood Group:* ${data?.customer?.blood_group || "N/A"}
+🏠 *Address:* ${data?.customer?.address || "N/A"}
 
-🕐 *Time:* ${new Date().toLocaleString("en-IN")}
+${locationLine}
 
-📸 *Accident Photo:*
+🕐 *Samay:* ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+
+📸 *Accident ki Photo:*
 ${imageUrl}
 
-⚠️ Turant madad karein!`;
+⚠️ *Kripya turant madad karein!*`;
 
-      setWaMessage(msg); // ✅ Buttons dikhenge neeche
-      toast.success("Photo upload ho gayi! Ab neeche se alert bhejo 👇");
+      setWaMessage(msg);
+      toast.success("Photo upload ho gayi! Neeche se alert bhejo 👇");
 
     } catch (err) {
       console.log("UPLOAD ERROR:", err);
@@ -166,7 +187,7 @@ ${imageUrl}
   }
 
   const { customer, contacts } = data;
-  const mapsLink = location ? `https://maps.google.com/?q=${location.lat},${location.lng}` : null;
+  const mapsLink = location ? `https://www.google.com/maps?q=${location.lat},${location.lng}` : null;
   const scanTime = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
 
   return (
@@ -177,6 +198,7 @@ ${imageUrl}
         <p className="text-muted-foreground">QR Code: {code}</p>
       </div>
 
+      {/* Location Banner */}
       <Card className="card-shadow border-orange-200 bg-orange-50">
         <CardContent className="p-3 space-y-1">
           <div className="flex items-center gap-2 text-sm">
@@ -187,16 +209,28 @@ ${imageUrl}
             <MapPin size={14} className="text-primary" />
             {location ? (
               <a href={mapsLink!} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-medium">
-                View Live Location on Maps
+                📍 View Live Location on Maps
               </a>
             ) : locationError ? (
-              <span className="text-muted-foreground">Location not available</span>
+              <span className="text-red-500 text-xs font-medium">
+                ⚠️ Location nahi mili — Phone ka GPS ON karo aur page reload karo
+              </span>
             ) : (
               <span className="text-muted-foreground flex items-center gap-1">
-                <Loader2 size={12} className="animate-spin" /> Getting location...
+                <Loader2 size={12} className="animate-spin" /> GPS dhundh raha hai...
               </span>
             )}
           </div>
+          {/* ✅ GPS ON karne ka button */}
+          {locationError && (
+            <Button
+              size="sm"
+              className="w-full mt-1 bg-orange-500 hover:bg-orange-600 text-white text-xs"
+              onClick={() => window.location.reload()}
+            >
+              🔄 GPS ON karke Reload karo
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -250,14 +284,14 @@ ${imageUrl}
         </CardContent>
       </Card>
 
-      {/* Accident Photo */}
+      {/* Accident Photo + WhatsApp Alert */}
       <Card className="card-shadow border-blue-200 bg-blue-50">
         <CardContent className="p-4 space-y-3">
           <h2 className="font-bold text-lg flex items-center gap-2">
-            <Camera size={18} className="text-blue-600" /> Accident Photo
+            <Camera size={18} className="text-blue-600" /> Accident Photo & Alert
           </h2>
           <p className="text-sm text-muted-foreground">
-            Photo lo — phir neeche har contact ko WhatsApp alert bhejo
+            Photo lo → sabko WhatsApp alert bhejo
           </p>
           <input
             ref={fileInputRef}
@@ -283,24 +317,26 @@ ${imageUrl}
             <div className="mt-2">
               <img src={photoUrl} alt="Accident" className="w-full rounded-lg border" />
               <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                <CheckCircle2 size={12} /> Photo saved successfully
+                <CheckCircle2 size={12} /> Photo save ho gayi ✅
               </p>
             </div>
           )}
 
-          {/* ✅ WhatsApp Alert Buttons — photo upload ke baad dikhte hain */}
+          {/* ✅ WhatsApp Alert Buttons */}
           {waMessage && contacts.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <p className="text-sm font-bold text-green-700">👇 Ab inhe WhatsApp alert bhejo:</p>
+            <div className="mt-3 space-y-2 border-t pt-3">
+              <p className="text-sm font-bold text-green-700 text-center">
+                👇 Har contact ko alert bhejo:
+              </p>
               {contacts.map((contact: any, i: number) => {
                 const phone = contact.phone.replace(/\D/g, "");
                 const indiaPhone = phone.startsWith("91") ? phone : `91${phone}`;
                 const waLink = `https://wa.me/${indiaPhone}?text=${encodeURIComponent(waMessage)}`;
                 return (
-                  <a key={i} href={waLink} target="_blank" rel="noopener noreferrer">
-                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white mb-1">
+                  <a key={i} href={waLink} target="_blank" rel="noopener noreferrer" className="block">
+                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
                       <Send size={14} className="mr-2" />
-                      📲 Alert bhejo — {contact.name}
+                      📲 {contact.name} ko Alert bhejo
                     </Button>
                   </a>
                 );
