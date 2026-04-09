@@ -9,7 +9,6 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
-import CustomerPanel from "./pages/CustomerPanel";
 import SalesmanPanel from "./pages/SalesmanPanel";
 import AdminPanel from "./pages/AdminPanel";
 import AgentPanel from "./pages/AgentPanel";
@@ -38,7 +37,6 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<CustomerPanel />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
 
             <Route path="/admin" element={
