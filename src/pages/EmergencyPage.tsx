@@ -70,17 +70,22 @@ const EmergencyPage = () => {
     setPhotoUploading(true);
     try {
       const fileName = `${code}_${Date.now()}.jpg`;
-      const { error } = await supabase.storage
-        .from("accident-photos")
-        .upload(fileName, file, { upsert: true });
-      if (error) throw error;
-      const { data: urlData } = supabase.storage
-        .from("accident-photos")
-        .getPublicUrl(fileName);
-      setPhotoUrl(urlData.publicUrl);
-      await saveScanReport(location?.lat, location?.lng, urlData.publicUrl);
-      toast.success("Photo uploaded successfully!");
-      const message = `🚨 ACCIDENT ALERT!
+const { error } = await supabase.storage
+  .from("accident-photos")
+  const imageUrl = URL.createObjectURL(file);
+setPhotoUrl(imageUrl); { upsert: true });
+
+if (error) throw error;
+
+const { data: urlData } = supabase.storage
+  .from("accident-photos")
+  .getPublicUrl(fileName);
+
+setPhotoUrl(urlData.publicUrl);
+await saveScanReport(location?.lat, location?.lng, urlData.publicUrl);
+toast.success("Photo uploaded successfully!");
+
+const message = `🚨 ACCIDENT ALERT!
 
 📍 Location:
 https://maps.google.com/?q=${location?.lat},${location?.lng}
