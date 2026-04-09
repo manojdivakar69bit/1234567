@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { QrCode, Users, Package, Plus, Trash2, ArrowLeft, LogOut, CheckCircle2, XCircle, Clock, Settings, IndianRupee, UserCheck } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { QrCode, Users, Package, Plus, Trash2, LogOut, CheckCircle2, XCircle, Clock, Settings, IndianRupee, UserCheck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import BulkStickerPrintCard from "@/components/BulkStickerPrintCard";
 import PrintHistoryCard from "@/components/PrintHistoryCard";
 
@@ -138,33 +138,38 @@ const AdminPanel = () => {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const unassignAllQrMutation = useMutation({
+    mutationFn: async (agentId: string) => {
+      const { error } = await supabase
+        .from("qr_codes")
+        .update({ assigned_agent_id: null, status: "available" })
+        .eq("assigned_agent_id", agentId)
+        .eq("status", "assigned");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
+      queryClient.invalidateQueries({ queryKey: ["agents"] });
+      toast.success("QR codes returned to stock!");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const deleteAgentMutation = useMutation({
     mutationFn: async (id: string) => {
+      // First unassign to avoid database conflicts
+      await supabase.from("qr_codes").update({ assigned_agent_id: null, status: "available" }).eq("assigned_agent_id", id);
       const { data, error } = await supabase.functions.invoke("delete-agent", { body: { agent_id: id } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["agents"] }); toast.success("Agent removed"); },
+    onSuccess: () => { 
+        queryClient.invalidateQueries({ queryKey: ["agents"] }); 
+        queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
+        toast.success("Agent removed"); 
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
-  const unassignAllQrMutation = useMutation({
-  mutationFn: async (agentId: string) => {
-    const { error } = await supabase
-      .from("qr_codes")
-      .update({ 
-        assigned_agent_id: null, 
-        status: "available" 
-      })
-      .eq("assigned_agent_id", agentId)
-      .eq("status", "assigned"); // Sirf wahi jo activate nahi huye hain
-
-    if (error) throw error;
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
-    toast.success("QR codes unassigned from agent");
-  },
-});
-  
 
   const addSalesmanMutation = useMutation({
     mutationFn: async () => {
@@ -267,20 +272,8 @@ const AdminPanel = () => {
                   <div>
                     <div className="font-medium">{agent.name}</div>
                     <div className="text-sm text-muted-foreground">{agent.email}</div>
-                    <div className="text-xs text-muted-foreground">{agent.phone || "No phone"}</div>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-  variant="outline" 
-  size="sm" 
-  onClick={() => unassignAllQrMutation.mutate(agent.id)}
-  disabled={unassignAllQrMutation.isPending || getAgentStats(agent.id).total === 0}
-  className="h-8 w-8 p-0"
-  title="Unassign QR Codes"
->
-  <Package size={14} className="text-orange-500" />
-</Button>
-                    
                     <Button size="sm" onClick={() => approveAgentMutation.mutate(agent.id)} className="bg-green-600 hover:bg-green-700 text-primary-foreground">
                       <CheckCircle2 size={14} className="mr-1" /> Approve
                     </Button>
@@ -342,7 +335,7 @@ const AdminPanel = () => {
               <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
                   <div className="font-medium">{s.name}</div>
-                  <div className="text-sm text-muted-foreground">{s.email} • {s.phone || "No phone"}</div>
+                  <div className="text-sm text-muted-foreground">{s.email}</div>
                 </div>
                 <Badge variant={s.status === "active" ? "default" : "secondary"}>{s.status}</Badge>
               </div>
@@ -352,85 +345,62 @@ const AdminPanel = () => {
 
         {/* Payment Records */}
         <Card className="card-shadow">
-          <CardHeader><CardTitle className="flex items-center gap-2"><IndianRupee size={18} /> Payment Records ({allPayments.length}) — Total: ₹{totalPayments}</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><IndianRupee size={18} /> Payments — Total: ₹{totalPayments}</CardTitle></CardHeader>
           <CardContent className="space-y-2 max-h-80 overflow-y-auto">
             {allPayments.map((p: any) => (
               <div key={p.id} className="flex items-center justify-between p-2 border rounded">
                 <div>
                   <div className="font-medium">{p.customer_name || "N/A"}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {p.collected_by_role} • {new Date(p.created_at).toLocaleDateString()}
-                  </div>
+                  <div className="text-xs text-muted-foreground">{p.collected_by_role} • {new Date(p.created_at).toLocaleDateString()}</div>
                 </div>
                 <div className="text-right">
                   <div className="font-bold">₹{p.amount}</div>
-                  <Badge variant="secondary">{p.payment_method}</Badge>
                 </div>
               </div>
             ))}
-            {allPayments.length === 0 && <p className="text-center text-muted-foreground text-sm py-4">No payments yet</p>}
           </CardContent>
         </Card>
 
-        {/* QR Codes List */}
-        <Card className="card-shadow">
-          <CardHeader><CardTitle className="flex items-center gap-2"><QrCode size={18} /> QR Codes ({qrCodes.length})</CardTitle></CardHeader>
-          <CardContent className="space-y-2 max-h-60 overflow-y-auto">
-            {qrCodes.map((qr: any) => (
-              <div key={qr.id} className="flex items-center justify-between p-2 border rounded">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm">{qr.code}</span>
-                  {qr.agents?.name && <span className="text-xs text-muted-foreground">→ {qr.agents.name}</span>}
-                </div>
-                <Badge variant={qr.status === "available" ? "secondary" : qr.status === "activated" ? "default" : "outline"}>
-                  {qr.status}
-                </Badge>
-              </div>
-            ))}
-            {qrCodes.length === 0 && <p className="text-center text-muted-foreground text-sm py-4">No QR codes yet</p>}
-          </CardContent>
-        </Card>
-
+        {/* Approved Agents List with Unassign and Delete */}
         <Card className="card-shadow">
           <CardHeader><CardTitle className="flex items-center gap-2"><Users size={18} /> Agents ({approvedAgents.length})</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+             <div className="grid grid-cols-2 gap-3">
               <Input placeholder="Agent Name" value={agentName} onChange={(e) => setAgentName(e.target.value)} />
               <Input placeholder="Phone" value={agentPhone} onChange={(e) => setAgentPhone(e.target.value)} />
               <Input placeholder="Email" value={agentEmail} onChange={(e) => setAgentEmail(e.target.value)} />
               <Input placeholder="Password" type="password" value={agentPassword} onChange={(e) => setAgentPassword(e.target.value)} />
             </div>
-            <Button onClick={() => addAgentMutation.mutate()} disabled={!agentName || !agentPhone || !agentEmail || !agentPassword || addAgentMutation.isPending} className="emergency-gradient hover:opacity-90 text-primary-foreground">
+            <Button onClick={() => addAgentMutation.mutate()} disabled={!agentName || !agentPhone || !agentEmail || !agentPassword || addAgentMutation.isPending} className="emergency-gradient hover:opacity-90 text-primary-foreground mb-4">
               <Plus size={14} className="mr-1" /> Add Agent
             </Button>
+
             {approvedAgents.map((agent: any) => {
               const stats = getAgentStats(agent.id);
               return (
                 <div key={agent.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
                     <div className="font-medium">{agent.name}</div>
-                    <div className="text-sm text-muted-foreground">{agent.phone}</div>
                     <div className="text-xs text-muted-foreground">QRs: {stats.total} (used: {stats.used})</div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => deleteAgentMutation.mutate(agent.id)}>
-                    <Trash2 size={14} />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => unassignAllQrMutation.mutate(agent.id)}
+                      disabled={unassignAllQrMutation.isPending || stats.total === 0}
+                      className="h-8 w-8 p-0"
+                      title="Return QRs to stock"
+                    >
+                      <Package size={14} className="text-orange-500" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => deleteAgentMutation.mutate(agent.id)}>
+                      <Trash2 size={14} className="text-red-500" />
+                    </Button>
+                  </div>
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
-
-        <Card className="card-shadow">
-          <CardHeader><CardTitle>Customers ({customers.length})</CardTitle></CardHeader>
-          <CardContent className="space-y-2 max-h-60 overflow-y-auto">
-            {customers.map((c: any) => (
-              <div key={c.id} className="p-2 border rounded">
-                <div className="font-medium">{c.name}</div>
-                <div className="text-sm text-muted-foreground">{c.vehicle_number} • Blood: {c.blood_group}</div>
-              </div>
-            ))}
-            {customers.length === 0 && <p className="text-center text-muted-foreground text-sm py-4">No customers yet</p>}
           </CardContent>
         </Card>
 
@@ -439,11 +409,10 @@ const AdminPanel = () => {
         <Card className="card-shadow">
           <CardHeader><CardTitle className="flex items-center gap-2"><Settings size={18} /> Settings</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <h3 className="font-semibold">Change Password</h3>
-            <div><Label>Current Password</Label><Input type="password" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} placeholder="Enter current password" /></div>
-            <div><Label>New Password</Label><Input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} placeholder="Enter new password" /></div>
-            <div><Label>Confirm New Password</Label><Input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} placeholder="Confirm new password" /></div>
-            <Button onClick={handleChangePassword} className="emergency-gradient hover:opacity-90 text-primary-foreground">Save Password</Button>
+            <div><Label>Current Password</Label><Input type="password" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} /></div>
+            <div><Label>New Password</Label><Input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} /></div>
+            <div><Label>Confirm Password</Label><Input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} /></div>
+            <Button onClick={handleChangePassword} className="emergency-gradient text-primary-foreground">Save Password</Button>
           </CardContent>
         </Card>
       </div>
