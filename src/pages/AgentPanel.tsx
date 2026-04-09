@@ -12,6 +12,7 @@ import { ScanLine, ArrowLeft, CheckCircle2, LogOut, IndianRupee, Users, Package 
 import { Link, useNavigate } from "react-router-dom";
 import QrScanner from "@/components/QrScanner";
 import EmergencyContactsForm, { type EmergencyContact } from "@/components/EmergencyContactsForm";
+import { useRazorpayCheckout } from "@/hooks/useRazorpayCheckout";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
