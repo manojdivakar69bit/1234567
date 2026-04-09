@@ -10,10 +10,7 @@ declare global {
 
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
-    if (window.Razorpay) {
-      resolve(true);
-      return;
-    }
+    if (window.Razorpay) { resolve(true); return; }
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.onload = () => resolve(true);
@@ -25,6 +22,8 @@ function loadRazorpayScript(): Promise<boolean> {
 interface RazorpayPaymentOptions {
   amount: number;
   customerName: string;
+  agentAccountId?: string;    // ✅ Agent Razorpay account
+  salesmanAccountId?: string; // ✅ Salesman Razorpay account
   onSuccess: (paymentId: string, orderId: string) => void;
   onError?: (error: string) => void;
 }
@@ -43,6 +42,8 @@ export function useRazorpayCheckout() {
         body: {
           amount: options.amount,
           customer_name: options.customerName,
+          agent_account_id: options.agentAccountId || null,       // ✅
+          salesman_account_id: options.salesmanAccountId || null,  // ✅
         },
       });
 
@@ -77,13 +78,9 @@ export function useRazorpayCheckout() {
             },
           },
         },
-        theme: {
-          color: "#dc2626",
-        },
+        theme: { color: "#dc2626" },
         modal: {
-          ondismiss: () => {
-            toast.info("Payment cancelled");
-          },
+          ondismiss: () => toast.info("Payment cancelled"),
         },
       };
 
