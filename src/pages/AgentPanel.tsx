@@ -31,7 +31,6 @@ const AgentPanel = () => {
   const [assignFrom, setAssignFrom] = useState("");
   const [assignTo, setAssignTo] = useState("");
   const [salesmanForm, setSalesmanForm] = useState({ name: "", email: "", password: "", phone: "" });
-  
 
   const { data: currentAgent } = useQuery({
     queryKey: ["current_agent"],
@@ -67,7 +66,7 @@ const AgentPanel = () => {
     enabled: !!currentAgent?.id,
   });
 
-  const lookupQr =   const addSalesmanMutation = useMutation({
+  const addSalesmanMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("create-salesman", {
         body: { ...salesmanForm, created_by_agent_id: currentAgent?.id },
@@ -82,7 +81,8 @@ const AgentPanel = () => {
     },
     onError: (e: any) => toast.error(e.message),
   });
-  ({
+
+  const lookupQr = useMutation({
     mutationFn: async (code: string) => {
       const { data, error } = await supabase
         .from("qr_codes")
@@ -226,7 +226,18 @@ const AgentPanel = () => {
         <Button variant={activeTab === "payment" ? "default" : "outline"} onClick={() => setActiveTab("payment")} className={activeTab === "payment" ? "emergency-gradient text-primary-foreground" : ""}>
           <IndianRupee size={16} className="mr-1" /> Payment
         </Button>
-        <Button variant={activeTab === "salesman" ? "default" : "outline"} onClick={() => setActiveTab("salesman")} className={activeTab === "salesman" ? "emergency-gradient text-primary-foreground" : ""}>          </</ {er Name *</Label><Input value={paymentCustomerName} onChange={(e) => setPaymentCustomerName(e.target.value)} /></div>
+        <Button variant={activeTab === "salesman" ? "default" : "outline"} onClick={() => setActiveTab("salesman")} className={activeTab === "salesman" ? "emergency-gradient text-primary-foreground" : ""}>
+          <Users size={16} className="mr-1" /> Salesman
+        </Button>
+      </div>
+
+      {/* Payment Tab */}
+      {activeTab === "payment" && (
+        <>
+          <Card className="card-shadow">
+            <CardHeader><CardTitle className="flex items-center gap-2"><IndianRupee size={18} /> Collect Payment</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div><Label>Customer Name *</Label><Input value={paymentCustomerName} onChange={(e) => setPaymentCustomerName(e.target.value)} /></div>
               <div><Label>Amount (₹) *</Label><Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} /></div>
               <div>
                 <Label>Payment Method</Label>
@@ -266,36 +277,20 @@ const AgentPanel = () => {
         </>
       )}
 
+      {/* Salesman Tab */}
       {activeTab === "salesman" && (
-                  <>
+        <>
           <Card className="card-shadow mb-6">
             <CardHeader><CardTitle>Create New Salesman</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <Input 
-                placeholder="Salesman Name" 
-                value={salesmanForm.name} 
-                onChange={(e) => setSalesmanForm({...salesmanForm, name: e.target.value})} 
-              />
-              <Input 
-                placeholder="Email" 
-                value={salesmanForm.email} 
-                onChange={(e) => setSalesmanForm({...salesmanForm, email: e.target.value})} 
-              />
-              <Input 
-                type="password" 
-                placeholder="Password" 
-                value={salesmanForm.password} 
-                onChange={(e) => setSalesmanForm({...salesmanForm, password: e.target.value})} 
-              />
-              <Button 
-                onClick={() => addSalesmanMutation.mutate()} 
-                className="w-full emergency-gradient text-white"
-                disabled={addSalesmanMutation.isPending}
-              >
+              <Input placeholder="Salesman Name" value={salesmanForm.name} onChange={(e) => setSalesmanForm({...salesmanForm, name: e.target.value})} />
+              <Input placeholder="Email" value={salesmanForm.email} onChange={(e) => setSalesmanForm({...salesmanForm, email: e.target.value})} />
+              <Input type="password" placeholder="Password" value={salesmanForm.password} onChange={(e) => setSalesmanForm({...salesmanForm, password: e.target.value})} />
+              <Button onClick={() => addSalesmanMutation.mutate()} className="w-full emergency-gradient hover:opacity-90 text-primary-foreground" disabled={addSalesmanMutation.isPending}>
                 {addSalesmanMutation.isPending ? "Creating..." : "Add Salesman"}
               </Button>
             </CardContent>
-          </Card
+          </Card>
           <Card className="card-shadow">
             <CardHeader><CardTitle className="flex items-center gap-2"><Package size={18} /> Assign QR to Salesman</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -332,6 +327,7 @@ const AgentPanel = () => {
         </>
       )}
 
+      {/* Register Tab */}
       {activeTab === "register" && (
         <>
           {!selectedQr ? (

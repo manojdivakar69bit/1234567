@@ -48,12 +48,10 @@ const EmergencyPage = () => {
   const saveScanReport = async (lat?: number, lng?: number, photo?: string) => {
     if (reportSaved) return;
     const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : null;
-    await supabase.from("scan_reports").insert({
+    await supabase.from("call_logs").insert({
       qr_code: code || "",
-      latitude: lat || null,
-      longitude: lng || null,
-      photo_url: photo || null,
-      maps_link: mapsLink,
+      status: "scanned",
+      caller_info: { latitude: lat || null, longitude: lng || null, photo_url: photo || null, maps_link: mapsLink } as any,
     });
     setReportSaved(true);
   };
