@@ -12,6 +12,7 @@ import { ScanLine, CheckCircle2, LogOut, IndianRupee } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import QrScanner from "@/components/QrScanner";
 import EmergencyContactsForm, { type EmergencyContact } from "@/components/EmergencyContactsForm";
+import { useRazorpayCheckout } from "@/hooks/useRazorpayCheckout";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -106,25 +107,41 @@ const SalesmanPanel = () => {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const { initiatePayment } = useRazorpayCheckout();
+
+  const savePayment = async (razorpayPaymentId?: string, razorpayOrderId?: string) => {
+    const { error } = await supabase.from("payments").insert({
+      amount: parseFloat(paymentAmount),
+      payment_method: paymentMethod,
+      status: "completed",
+      collected_by_role: "salesman",
+      collected_by_id: currentSalesman?.id,
+      customer_name: paymentCustomerName,
+      razorpay_payment_id: razorpayPaymentId || null,
+      razorpay_order_id: razorpayOrderId || null,
+    });
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["salesman_payments"] });
+    setPaymentAmount("");
+    setPaymentCustomerName("");
+    setPaymentMethod("cash");
+    toast.success("Payment collected!");
+  };
+
   const collectPaymentMutation = useMutation({
     mutationFn: async () => {
       if (!paymentAmount || !paymentCustomerName) throw new Error("Amount and customer name required");
-      const { error } = await supabase.from("payments").insert({
-        amount: parseFloat(paymentAmount),
-        payment_method: paymentMethod,
-        status: "completed",
-        collected_by_role: "salesman",
-        collected_by_id: currentSalesman?.id,
-        customer_name: paymentCustomerName,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salesman_payments"] });
-      setPaymentAmount("");
-      setPaymentCustomerName("");
-      setPaymentMethod("cash");
-      toast.success("Payment collected!");
+      if (paymentMethod === "razorpay") {
+        initiatePayment({
+          amount: parseFloat(paymentAmount),
+          customerName: paymentCustomerName,
+          onSuccess: async (paymentId, orderId) => {
+            await savePayment(paymentId, orderId);
+          },
+        });
+        return;
+      }
+      await savePayment();
     },
     onError: (err: Error) => toast.error(err.message),
   });
