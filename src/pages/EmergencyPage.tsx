@@ -56,11 +56,11 @@ const EmergencyPage = () => {
   };
 
   // Auto save report when location is captured
-  useState(() => {
-    if (location) {
-      saveScanReport(location.lat, location.lng);
-    }
-  });
+  useEffect(() => {
+  if (location) {
+    saveScanReport(location.lat, location.lng);
+  }
+}, [location]);
 
   // Photo upload handler
  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
