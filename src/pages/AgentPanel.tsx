@@ -136,25 +136,41 @@ const AgentPanel = () => {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const { initiatePayment } = useRazorpayCheckout();
+
+  const savePayment = async (razorpayPaymentId?: string, razorpayOrderId?: string) => {
+    const { error } = await supabase.from("payments").insert({
+      amount: parseFloat(paymentAmount),
+      payment_method: paymentMethod,
+      status: "completed",
+      collected_by_role: "agent",
+      collected_by_id: currentAgent?.id,
+      customer_name: paymentCustomerName,
+      razorpay_payment_id: razorpayPaymentId || null,
+      razorpay_order_id: razorpayOrderId || null,
+    });
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["agent_payments"] });
+    setPaymentAmount("");
+    setPaymentCustomerName("");
+    setPaymentMethod("cash");
+    toast.success("Payment collected!");
+  };
+
   const collectPaymentMutation = useMutation({
     mutationFn: async () => {
       if (!paymentAmount || !paymentCustomerName) throw new Error("Amount and customer name required");
-      const { error } = await supabase.from("payments").insert({
-        amount: parseFloat(paymentAmount),
-        payment_method: paymentMethod,
-        status: "completed",
-        collected_by_role: "agent",
-        collected_by_id: currentAgent?.id,
-        customer_name: paymentCustomerName,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["agent_payments"] });
-      setPaymentAmount("");
-      setPaymentCustomerName("");
-      setPaymentMethod("cash");
-      toast.success("Payment collected!");
+      if (paymentMethod === "razorpay") {
+        initiatePayment({
+          amount: parseFloat(paymentAmount),
+          customerName: paymentCustomerName,
+          onSuccess: async (paymentId, orderId) => {
+            await savePayment(paymentId, orderId);
+          },
+        });
+        return;
+      }
+      await savePayment();
     },
     onError: (err: Error) => toast.error(err.message),
   });
