@@ -42,7 +42,7 @@ const getAddressFromCoords = async (lat: number, lng: number): Promise<string> =
       { headers: { "Accept-Language": "en" } }
     );
     const data = await res.json();
-    return data.display_name || "Address nahi mila";
+    return data.display_name || "Address not found";
   } catch {
     return "";
   }
@@ -114,7 +114,7 @@ const EmergencyPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoUploading(true);
-    toast("📍 Location aur photo le raha hai...");
+    toast("Fetching location & uploading photo...");
 
     try {
       let currentLocation = locationRef.current;
@@ -123,7 +123,6 @@ const EmergencyPage = () => {
         if (currentLocation) setLocation(currentLocation);
       }
 
-      // ✅ Address fetch karo
       let addressName = "";
       if (currentLocation) {
         addressName = await getAddressFromCoords(currentLocation.lat, currentLocation.lng);
@@ -142,29 +141,29 @@ const EmergencyPage = () => {
 
       const locationLine = currentLocation
         ? `📍 *Location:*\n${addressName}\n\n🗺️ *Google Maps:*\nhttps://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`
-        : `📍 *Location:* GPS nahi mila\n🏠 *Address:* ${data?.customer?.address || "N/A"}`;
+        : `📍 *Location:* GPS unavailable\n🏠 *Address:* ${data?.customer?.address || "N/A"}`;
 
       const msg =
 `🚨 *ACCIDENT ALERT!*
 
-👤 *Naam:* ${data?.customer?.name || "Unknown"}
-🚗 *Gaadi:* ${data?.customer?.vehicle_number || "N/A"}
+👤 *Name:* ${data?.customer?.name || "Unknown"}
+🚗 *Vehicle:* ${data?.customer?.vehicle_number || "N/A"}
 🩸 *Blood Group:* ${data?.customer?.blood_group || "N/A"}
 
 ${locationLine}
 
-🕐 *Samay:* ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+🕐 *Time:* ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
 
 📸 *Accident Photo:*
 ${imageUrl}
 
-⚠️ *Turant madad karein!*`;
+⚠️ *Please rush immediately!*`;
 
       setWaMessage(msg);
-      toast.success("✅ Ready! Neeche se alert bhejo 👇");
+      toast.success("Ready! Send alerts below 👇");
     } catch (err) {
       console.log("UPLOAD ERROR:", err);
-      toast.error("Photo upload failed");
+      toast.error("Photo upload failed. Please try again.");
     } finally {
       setPhotoUploading(false);
     }
@@ -204,15 +203,15 @@ ${imageUrl}
           <div className="flex items-center gap-2 text-sm">
             <MapPin size={14} className="text-primary" />
             {location ? (
-              <a href={mapsLink!} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-medium">📍 Live Location dekho Maps pe</a>
+              <a href={mapsLink!} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-medium">📍 View Live Location on Maps</a>
             ) : locationError ? (
-              <span className="text-red-500 text-xs font-medium">⚠️ GPS band hai — Settings mein Location ON karo</span>
+              <span className="text-red-500 text-xs font-medium">⚠️ GPS is off — Please enable Location in Settings</span>
             ) : (
-              <span className="text-muted-foreground flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> GPS dhundh raha hai...</span>
+              <span className="text-muted-foreground flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Fetching GPS location...</span>
             )}
           </div>
           {locationError && (
-            <Button size="sm" className="w-full mt-1 bg-orange-500 hover:bg-orange-600 text-white text-xs" onClick={() => window.location.reload()}>🔄 Reload karo</Button>
+            <Button size="sm" className="w-full mt-1 bg-orange-500 hover:bg-orange-600 text-white text-xs" onClick={() => window.location.reload()}>🔄 Reload Page</Button>
           )}
         </CardContent>
       </Card>
@@ -250,26 +249,30 @@ ${imageUrl}
       <Card className="card-shadow border-blue-200 bg-blue-50">
         <CardContent className="p-4 space-y-3">
           <h2 className="font-bold text-lg flex items-center gap-2"><Camera size={18} className="text-blue-600" /> Accident Photo & Alert</h2>
-          <p className="text-sm text-muted-foreground">Photo lo → location + address attach hoga → alert bhejo</p>
+          <p className="text-sm text-muted-foreground">
+            Every second counts in an emergency. 📸 Click a photo of the accident — we'll automatically attach the live location & address, so their family reaches in time.
+          </p>
           <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
           <Button onClick={() => fileInputRef.current?.click()} disabled={photoUploading} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-            {photoUploading ? <><Loader2 size={16} className="animate-spin mr-2" /> Location + Photo le raha hai...</> : <><Camera size={16} className="mr-2" /> 📸 Take Accident Photo</>}
+            {photoUploading
+              ? <><Loader2 size={16} className="animate-spin mr-2" /> Fetching location & uploading...</>
+              : <><Camera size={16} className="mr-2" /> 📸 Click Accident Photo</>}
           </Button>
           {photoUrl && (
             <div className="mt-2">
               <img src={photoUrl} alt="Accident" className="w-full rounded-lg border" />
-              <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><CheckCircle2 size={12} /> Photo save ho gayi ✅</p>
+              <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><CheckCircle2 size={12} /> Photo saved successfully ✅</p>
             </div>
           )}
           {waMessage && contacts.length > 0 && (
             <div className="mt-3 space-y-2 border-t pt-3">
-              <p className="text-sm font-bold text-green-700 text-center">👇 Har contact ko alert bhejo:</p>
+              <p className="text-sm font-bold text-green-700 text-center">👇 Send WhatsApp alert to each contact:</p>
               {contacts.map((contact: any, i: number) => {
                 const phone = contact.phone.replace(/\D/g, "");
                 const indiaPhone = phone.startsWith("91") ? phone : `91${phone}`;
                 return (
                   <a key={i} href={`https://wa.me/${indiaPhone}?text=${encodeURIComponent(waMessage)}`} target="_blank" rel="noopener noreferrer" className="block">
-                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white"><Send size={14} className="mr-2" />📲 {contact.name} ko Alert bhejo</Button>
+                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white"><Send size={14} className="mr-2" />📲 Send Alert to {contact.name}</Button>
                   </a>
                 );
               })}
