@@ -303,6 +303,26 @@ const AdminPanel = () => {
                   <tr key={a.id} className="border-b">
                     <td className="p-3 font-medium">{a.name}</td>
                     <td className="p-3">
+  <div className="flex gap-1">
+    <Input 
+      placeholder="New Pwd" 
+      type="password" 
+      className="h-8 text-xs w-24" 
+      value={resetPasswords[a.id] || ""}
+      onChange={e => setResetPasswords({...resetPasswords, [a.id]: e.target.value})}
+    />
+    <Button 
+      size="sm" 
+      variant="secondary" 
+      className="h-8 px-2"
+      onClick={() => resetUserPasswordMutation.mutate({ userId: a.user_id, newPassword: resetPasswords[a.id] })}
+    >
+      <Lock size={12}/>
+    </Button>
+  </div>
+</td>
+                    
+                    <td className="p-3">
                       <div className="flex gap-1"><Input placeholder="New" type="password" className="h-7 text-[10px] w-20" onChange={e=>setUserResetData({id:a.id, newPwd:e.target.value})}/><Button size="sm" className="h-7 px-2" onClick={()=>toast.success("Password Updated")}><Lock size={12}/></Button></div>
                     </td>
                     <td className="p-3 text-center"><Button variant="ghost" size="sm" className="text-red-500 h-8 w-8 p-0" onClick={()=>{if(confirm("Delete Agent?")) deleteUserMutation.mutate({id:a.id, type:'agent'})}}><Trash2 size={16}/></Button></td>
