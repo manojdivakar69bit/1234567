@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ScanLine, CheckCircle2, LogOut, IndianRupee } from "lucide-react";
+import { ScanLine, CheckCircle2, LogOut, IndianRupee, KeyRound, Lock } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import QrScanner from "@/components/QrScanner";
 import EmergencyContactsForm, { type EmergencyContact } from "@/components/EmergencyContactsForm";
@@ -24,7 +24,8 @@ const SalesmanPanel = () => {
   const [form, setForm] = useState({ name: "", vehicle_number: "", blood_group: "", address: "" });
   const [contacts, setContacts] = useState<EmergencyContact[]>([{ name: "", phone: "", relationship: "" }]);
   const [success, setSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<"register" | "payment">("register");
+  const [activeTab, setActiveTab] = useState<"register" | "payment" | "password">("register");
+  const [pwdForm, setPwdForm] = useState({ newPwd: "", confirm: "" });
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentCustomerName, setPaymentCustomerName] = useState("");
@@ -164,6 +165,20 @@ const SalesmanPanel = () => {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const changePasswordMutation = useMutation({
+    mutationFn: async () => {
+      if (pwdForm.newPwd !== pwdForm.confirm) throw new Error("Passwords do not match");
+      if (pwdForm.newPwd.length < 6) throw new Error("Password must be at least 6 characters");
+      const { error } = await supabase.auth.updateUser({ password: pwdForm.newPwd });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setPwdForm({ newPwd: "", confirm: "" });
+      toast.success("Password changed successfully!");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem("cmf_role");
@@ -190,8 +205,8 @@ const SalesmanPanel = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-lg mx-auto space-y-6">
-      <div className="flex justify-center pt-2">
-        <img src="/logo.png" alt="Call My Family" className="w-40 h-40 object-contain" />
+      <div className="w-full">
+        <img src="/logo.png" alt="Call My Family" className="w-full object-contain" />
       </div>
 
       <div className="flex items-center justify-between">
@@ -208,6 +223,9 @@ const SalesmanPanel = () => {
         </Button>
         <Button variant={activeTab === "payment" ? "default" : "outline"} onClick={() => setActiveTab("payment")} className={activeTab === "payment" ? "emergency-gradient text-primary-foreground" : ""}>
           <IndianRupee size={16} className="mr-1" /> Payment
+        </Button>
+        <Button variant={activeTab === "password" ? "default" : "outline"} onClick={() => setActiveTab("password")} className={activeTab === "password" ? "emergency-gradient text-primary-foreground" : ""}>
+          <KeyRound size={16} className="mr-1" /> Password
         </Button>
       </div>
 
@@ -271,6 +289,31 @@ const SalesmanPanel = () => {
             </Card>
           )}
         </>
+      )}
+
+      {/* Password Tab */}
+      {activeTab === "password" && (
+        <Card className="card-shadow border-red-100">
+          <CardHeader><CardTitle className="flex items-center gap-2"><KeyRound size={18} className="text-red-600" /> Change Password</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>New Password *</Label>
+              <Input type="password" placeholder="Enter new password" value={pwdForm.newPwd} onChange={e => setPwdForm({...pwdForm, newPwd: e.target.value})} />
+            </div>
+            <div>
+              <Label>Confirm Password *</Label>
+              <Input type="password" placeholder="Confirm new password" value={pwdForm.confirm} onChange={e => setPwdForm({...pwdForm, confirm: e.target.value})} />
+            </div>
+            <Button
+              onClick={() => changePasswordMutation.mutate()}
+              disabled={!pwdForm.newPwd || !pwdForm.confirm || changePasswordMutation.isPending}
+              className="w-full bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Lock size={14} className="mr-2" />
+              {changePasswordMutation.isPending ? "Changing..." : "Update Password"}
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {/* Register Tab */}
