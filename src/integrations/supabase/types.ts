@@ -22,6 +22,7 @@ export type Database = {
           id: string
           name: string
           phone: string | null
+          razorpay_account_id: string | null
           updated_at: string
           user_id: string | null
         }
@@ -32,6 +33,7 @@ export type Database = {
           id?: string
           name: string
           phone?: string | null
+          razorpay_account_id?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -42,8 +44,33 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          razorpay_account_id?: string | null
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string
         }
         Relationships: []
       }
@@ -158,9 +185,11 @@ export type Database = {
       }
       payments: {
         Row: {
+          agent_id: string | null
           amount: number
           collected_by_id: string | null
           collected_by_role: string
+          collector_name: string | null
           created_at: string
           customer_name: string | null
           id: string
@@ -173,9 +202,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agent_id?: string | null
           amount: number
           collected_by_id?: string | null
           collected_by_role: string
+          collector_name?: string | null
           created_at?: string
           customer_name?: string | null
           id?: string
@@ -188,9 +219,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agent_id?: string | null
           amount?: number
           collected_by_id?: string | null
           collected_by_role?: string
+          collector_name?: string | null
           created_at?: string
           customer_name?: string | null
           id?: string
@@ -290,35 +323,49 @@ export type Database = {
       salesmen: {
         Row: {
           created_at: string
+          created_by_agent_id: string | null
           email: string
           id: string
           name: string
           phone: string | null
+          razorpay_account_id: string | null
           status: string
           updated_at: string
           user_id: string | null
         }
         Insert: {
           created_at?: string
+          created_by_agent_id?: string | null
           email: string
           id?: string
           name: string
           phone?: string | null
+          razorpay_account_id?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
         }
         Update: {
           created_at?: string
+          created_by_agent_id?: string | null
           email?: string
           id?: string
           name?: string
           phone?: string | null
+          razorpay_account_id?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "salesmen_created_by_agent_id_fkey"
+            columns: ["created_by_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
