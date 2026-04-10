@@ -88,7 +88,7 @@ body {
   position: absolute;
   top: 33%;
   left: 9%;
-  width: 82%;
+  width: 62%;
   height: 49%;
   display: flex;
   align-items: center;
@@ -123,7 +123,7 @@ body {
   text-shadow: 0 1px 1px rgba(255,255,255,0.4);
 }
 @media print {
-  body { background: white; }
+  body { background: silver; }
 }
 </style>
 </head>
