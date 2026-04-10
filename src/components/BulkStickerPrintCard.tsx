@@ -17,7 +17,25 @@ interface Props {
   printableCount: number;
 }
 
-const openStickerPrintWindow = (codes: string[], baseUrl: string) => {
+// ✅ Image ko Base64 mein convert karo
+const imageToBase64 = (url: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => reject(new Error("Image load failed"));
+    img.src = url;
+  });
+};
+
+const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: string) => {
   const stickers = codes.map((code) => {
     const qr = renderToStaticMarkup(
       <QRCodeSVG
@@ -30,7 +48,7 @@ const openStickerPrintWindow = (codes: string[], baseUrl: string) => {
 
     return `
     <div class="sticker">
-      <img src="${baseUrl}/sticker-bg.png" class="bg-img" />
+      <img src="${bgBase64}" class="bg-img" />
       <div class="qr-overlay">
         <div class="qr-wrap">${qr}</div>
       </div>
@@ -46,7 +64,6 @@ const openStickerPrintWindow = (codes: string[], baseUrl: string) => {
 <style>
 @page { margin: 0.3cm; size: A4; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
 body {
   background: #111;
   padding: 6px;
@@ -57,7 +74,6 @@ body {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
-
 .sticker {
   position: relative;
   width: 5.8cm;
@@ -65,7 +81,6 @@ body {
   display: inline-block;
   flex-shrink: 0;
 }
-
 .bg-img {
   position: absolute;
   top: 0; left: 0;
@@ -75,8 +90,6 @@ body {
   border-radius: 12px;
   display: block;
 }
-
-/* QR — silver frame box pe */
 .qr-overlay {
   position: absolute;
   top: 33%;
@@ -87,7 +100,6 @@ body {
   align-items: center;
   justify-content: center;
 }
-
 .qr-wrap {
   width: 90%;
   height: 90%;
@@ -98,14 +110,11 @@ body {
   align-items: center;
   justify-content: center;
 }
-
 .qr-wrap svg {
   width: 100% !important;
   height: 100% !important;
   display: block;
 }
-
-/* Serial number — neeche silver plate pe */
 .code-label {
   position: absolute;
   bottom: 9%;
@@ -119,7 +128,6 @@ body {
   letter-spacing: 2px;
   text-shadow: 0 1px 1px rgba(255,255,255,0.4);
 }
-
 @media print {
   body { background: white; }
 }
@@ -143,16 +151,20 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
 
   const mutation = useMutation({
     mutationFn: async () => {
+      // ✅ Pehle image Base64 mein convert karo
+      const bgBase64 = await imageToBase64(`${baseUrl}/sticker-bg.png`);
+
       const { data, error } = await supabase
         .from("qr_codes")
         .select("code")
         .neq("status", "activated")
         .limit(Number(count));
       if (error) throw error;
-      return data.map((d: any) => d.code);
+
+      return { codes: data.map((d: any) => d.code), bgBase64 };
     },
-    onSuccess: (codes) => {
-      openStickerPrintWindow(codes, baseUrl);
+    onSuccess: ({ codes, bgBase64 }) => {
+      openStickerPrintWindow(codes, bgBase64, baseUrl);
       toast.success("Premium stickers ready!");
     },
     onError: (e: any) => toast.error(e.message),
