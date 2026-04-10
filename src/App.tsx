@@ -16,6 +16,7 @@ import EmergencyPage from "./pages/EmergencyPage";
 import PrintStickerPage from "./pages/PrintStickerPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
+import RegisterPage from "./pages/RegisterPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
