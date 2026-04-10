@@ -157,7 +157,7 @@ const AdminPanel = () => {
     }
   });
 
-  const deleteUserMutation = useMutation({
+    const deleteUserMutation = useMutation({
     mutationFn: async ({ id, type }: { id: string, type: 'agent' | 'salesman' }) => {
       const table = type === 'agent' ? 'agents' : 'salesmen';
       const { error } = await supabase.from(table).delete().eq("id", id);
@@ -168,20 +168,22 @@ const AdminPanel = () => {
       toast.success("User Deleted");
     }
   });
+
   const resetUserPasswordMutation = useMutation({
-  mutationFn: async ({ userId, newPassword }) => {
-    if (!newPassword || newPassword.length < 6) throw new Error("Min 6 characters");
-    const { error } = await supabase.functions.invoke("reset-user-password", {
-      body: { userId, newPassword }
-    });
-    if (error) throw error;
-  },
-  onSuccess: () => {
-    toast.success("Password Updated!");
-    setResetPasswords({});
-  },
-  onError: (e) => toast.error(e.message)
-});
+    mutationFn: async ({ userId, newPassword }: { userId: string, newPassword: string }) => {
+      if (!newPassword || newPassword.length < 6) throw new Error("Min 6 characters");
+      const { error } = await supabase.functions.invoke("reset-user-password", {
+        body: { userId, newPassword }
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Password Updated!");
+      setResetPasswords({});
+    },
+    onError: (e: any) => toast.error(e.message)
+  });
+}
   const generateQrMutation = useMutation({
     mutationFn: async (count: number) => {
       const { data: existing } = await supabase.from("qr_codes").select("code").order("code", { ascending: false }).limit(1);
