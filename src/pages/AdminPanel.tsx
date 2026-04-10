@@ -29,6 +29,7 @@ const AdminPanel = () => {
   const [assignAgentId, setAssignAgentId] = useState("");
   const [agentForm, setAgentForm] = useState({ name: "", phone: "", email: "", password: "", bank: "", acc: "", ifsc: "" });
   const [salesmanForm, setSalesmanForm] = useState({ name: "", phone: "", email: "", password: "", bank: "", acc: "", ifsc: "" });
+  const [resetPasswords, setResetPasswords] = useState({});
   const [pwdForm, setPwdForm] = useState({ current: "", new: "", confirm: "" });
   const [userResetData, setUserResetData] = useState({ id: "", newPwd: "" });
 
@@ -167,7 +168,20 @@ const AdminPanel = () => {
       toast.success("User Deleted");
     }
   });
-
+  const resetUserPasswordMutation = useMutation({
+  mutationFn: async ({ userId, newPassword }) => {
+    if (!newPassword || newPassword.length < 6) throw new Error("Min 6 characters");
+    const { error } = await supabase.functions.invoke("reset-user-password", {
+      body: { userId, newPassword }
+    });
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    toast.success("Password Updated!");
+    setResetPasswords({});
+  },
+  onError: (e) => toast.error(e.message)
+});
   const generateQrMutation = useMutation({
     mutationFn: async (count: number) => {
       const { data: existing } = await supabase.from("qr_codes").select("code").order("code", { ascending: false }).limit(1);
