@@ -87,8 +87,8 @@ body {
 .qr-overlay {
   position: absolute;
   top: 33%;
-  left: 9%;
-  width: 62%;
+  left: 11%;
+  width: 82%;
   height: 49%;
   display: flex;
   align-items: center;
@@ -98,7 +98,7 @@ body {
   width: 90%;
   height: 90%;
   background: white;
-  border-radius: 8px;
+  border-radius: 5px;
   padding: 4px;
   display: flex;
   align-items: center;
