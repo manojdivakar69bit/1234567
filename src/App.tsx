@@ -39,6 +39,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/register" element={<RegisterPage />} />
 
             <Route path="/admin" element={
               <ProtectedRoute allowedRoles={["admin"]}>
