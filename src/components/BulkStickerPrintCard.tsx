@@ -5,178 +5,159 @@ import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Printer } from "lucide-react";
 
 const PRINT_OPTIONS = ["10", "20", "50", "100", "500", "1000"] as const;
 
-const SIZE_PRESETS = [
-  { label: "3×4 cm", w: 3, h: 4 },
-  { label: "4×6 cm", w: 4, h: 6 },
-  { label: "6×8 cm", w: 6, h: 8 },
-  { label: "8×10 cm", w: 8, h: 10 },
-  { label: "Custom", w: 0, h: 0 },
-];
-
-interface BulkStickerPrintCardProps {
+interface Props {
   baseUrl: string;
   printableCount: number;
 }
 
-/* 🔥 PREMIUM PRINT WINDOW */
-const openStickerPrintWindow = (codes: string[], baseUrl: string, wCm: number, hCm: number) => {
-  const qrSize = Math.min(wCm, hCm) * 0.65;
+/* ================== 🔥 PREMIUM PRINT FUNCTION ================== */
 
-  const stickersMarkup = codes
-    .map((code) => {
-      const qrMarkup = renderToStaticMarkup(
-        <QRCodeSVG value={`${baseUrl}/emergency/${code}`} size={qrSize * 28} level="H" />
-      );
+const openStickerPrintWindow = (codes: string[], baseUrl: string) => {
 
-      return `
-        <div class="sticker">
-          
-          <div class="header">
-            <div class="logo">🚨</div>
-            <div class="title">Call My Family</div>
-          </div>
+  const stickers = codes.map((code) => {
 
-          <div class="scan-text">SCAN IN EMERGENCY</div>
+    const qr = renderToStaticMarkup(
+      <QRCodeSVG
+        value={`${baseUrl}/emergency/${code}`}
+        size={220}
+        level="H"
+        includeMargin={true}
+      />
+    );
 
-          <div class="qr-box">${qrMarkup}</div>
+    return `
+    <div class="sticker">
+      <div class="card">
 
-          <div class="code">${code}</div>
+        <div class="top">
+          <div class="logo">❤️</div>
+          <div class="title">Call My Family</div>
+          <div class="subtitle">Scan in Emergency<br><span>for Instant Help</span></div>
+        </div>
 
-          <div class="footer">Instant Help • Secure</div>
+        <div class="qr-frame">
+          <div class="qr-inner">${qr}</div>
+        </div>
 
-        </div>`;
-    })
-    .join("");
+        <div class="code">${code}</div>
 
-  const html = `<!DOCTYPE html>
+        <div class="footer">Protected by CallMyFamily</div>
+
+      </div>
+    </div>
+    `;
+  }).join("");
+
+  const html = `
+<!DOCTYPE html>
 <html>
 <head>
-<title>Premium QR Stickers</title>
+<title>Premium Stickers</title>
 
 <style>
 @page { margin: 0.5cm; }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
 body {
   font-family: Arial;
-  background: #ffffff;
+  background: #111;
+  text-align: center;
 }
 
-/* GRID */
-.grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5cm;
-  justify-content: center;
-}
-
-/* 🔥 PREMIUM STICKER */
+/* STICKER SIZE */
 .sticker {
-  width: ${wCm}cm;
-  height: ${hCm}cm;
-  border-radius: 14px;
-  background: linear-gradient(145deg, #0f172a, #020617);
-  color: white;
-  padding: 0.3cm;
+  width: 6cm;
+  height: 8cm;
+  display: inline-block;
+  margin: 0.3cm;
+}
+
+/* CARD */
+.card {
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  padding: 8px;
+
+  background: radial-gradient(circle at top, #1e293b, #020617);
+
+  border: 2px solid gold;
+
+  box-shadow:
+    0 0 10px gold,
+    0 0 25px #2563eb,
+    inset 0 0 20px rgba(255,255,255,0.05);
+
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  position: relative;
-  page-break-inside: avoid;
-
-  box-shadow:
-    0 0 10px #1e3a8a,
-    0 0 20px #2563eb;
-}
-
-/* GOLD BORDER */
-.sticker::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: 14px;
-  background: linear-gradient(45deg, gold, orange, gold);
-  z-index: -1;
-}
-
-/* HEADER */
-.header {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
 }
 
+/* TOP */
 .logo {
-  font-size: ${Math.max(10, wCm * 3)}px;
+  font-size: 18px;
 }
 
 .title {
-  font-size: ${Math.max(7, wCm * 1.8)}pt;
+  color: #facc15;
   font-weight: bold;
+  font-size: 14px;
 }
 
-/* SCAN TEXT */
-.scan-text {
-  text-align: center;
-  font-size: ${Math.max(5, wCm * 1.2)}pt;
+.subtitle {
+  color: #e2e8f0;
+  font-size: 10px;
+}
+
+.subtitle span {
   color: #38bdf8;
-  letter-spacing: 1px;
 }
 
-/* QR BOX */
-.qr-box {
-  background: white;
-  padding: 0.2cm;
-  border-radius: 10px;
+/* QR FRAME */
+.qr-frame {
+  width: 90%;
+  padding: 6px;
+  border-radius: 15px;
+
+  background: linear-gradient(145deg, #d4d4d8, #71717a);
 
   box-shadow:
-    0 0 10px #0ea5e9,
+    inset 0 0 10px rgba(0,0,0,0.6),
+    0 0 10px gold,
     0 0 20px #2563eb;
+}
+
+.qr-inner {
+  background: white;
+  border-radius: 10px;
+  padding: 5px;
+}
+
+.qr-inner svg {
+  width: 100% !important;
 }
 
 /* CODE */
 .code {
-  text-align: center;
-  font-size: ${Math.max(7, wCm * 1.6)}pt;
   font-weight: bold;
-  letter-spacing: 1px;
+  color: white;
 }
 
 /* FOOTER */
 .footer {
-  text-align: center;
-  font-size: ${Math.max(4, wCm * 1)}pt;
-  opacity: 0.8;
-}
-
-/* PRINT BTN */
-.no-print {
-  text-align: center;
-  margin: 10px;
-}
-
-button {
-  padding: 10px 25px;
-  font-size: 16px;
-  background: #2563eb;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  font-size: 9px;
+  color: #facc15;
 }
 
 @media print {
-  .no-print { display: none; }
+  body { background: white; }
 }
 </style>
 
@@ -184,100 +165,84 @@ button {
 
 <body>
 
-<div class="no-print">
-  <button onclick="window.print()">🖨️ Print Stickers</button>
-</div>
-
-<div class="grid">
-${stickersMarkup}
-</div>
+${stickers}
 
 <script>
-setTimeout(() => { window.print(); }, 500);
+window.onload = () => setTimeout(() => window.print(), 300);
 </script>
 
 </body>
-</html>`;
+</html>
+`;
 
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
   window.open(url, "_blank");
 };
 
-/* COMPONENT */
-const BulkStickerPrintCard = ({ baseUrl, printableCount }: BulkStickerPrintCardProps) => {
-  const [selectedCount, setSelectedCount] = useState("10");
-  const [sizePreset, setSizePreset] = useState("6×8 cm");
-  const [customW, setCustomW] = useState("6");
-  const [customH, setCustomH] = useState("8");
+/* ================== UI ================== */
 
-  const isCustom = sizePreset === "Custom";
-  const currentSize = isCustom
-    ? { w: parseFloat(customW) || 6, h: parseFloat(customH) || 8 }
-    : SIZE_PRESETS.find((s) => s.label === sizePreset) || { w: 6, h: 8 };
+export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props) {
+  const [count, setCount] = useState("10");
 
-  const printMutation = useMutation({
-    mutationFn: async (count: string) => {
-      const limit = Number(count);
-
+  const mutation = useMutation({
+    mutationFn: async () => {
       const { data, error } = await supabase
         .from("qr_codes")
         .select("code")
-        .in("status", ["available", "assigned"])
-        .order("code")
-        .limit(limit);
+        .limit(Number(count));
 
       if (error) throw error;
-      if (!data || data.length === 0) throw new Error("No QR codes available");
 
-      return { requested: limit, codes: data.map((d: any) => d.code) };
+      return data.map((d: any) => d.code);
     },
 
-    onSuccess: async ({ requested, codes }) => {
-      openStickerPrintWindow(codes, baseUrl, currentSize.w, currentSize.h);
-
-      await supabase.from("print_history").insert({
-        printed_by: localStorage.getItem("cmf_email") || "unknown",
-        count: codes.length,
-        code_from: codes[0],
-        code_to: codes[codes.length - 1],
-      });
-
-      toast.success(`${codes.length} stickers ready`);
+    onSuccess: (codes) => {
+      openStickerPrintWindow(codes, baseUrl);
+      toast.success("Ready to print 🔥");
     },
 
-    onError: (err: any) => toast.error(err.message),
+    onError: (e: any) => {
+      toast.error(e.message);
+    }
   });
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex gap-2 items-center">
-          <Printer size={18} /> Print Premium Stickers
+          <Printer size={18}/> Print Stickers
         </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-4">
 
-        <Select value={selectedCount} onValueChange={setSelectedCount}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {PRINT_OPTIONS.map((o) => (
-              <SelectItem key={o} value={o}>{o}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div>
+          <Label>Select Count</Label>
+          <Select value={count} onValueChange={setCount}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {PRINT_OPTIONS.map((o) => (
+                <SelectItem key={o} value={o}>{o}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <Button
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending}
           className="w-full"
-          onClick={() => printMutation.mutate(selectedCount)}
         >
-          Print Stickers
+          <Printer size={14} className="mr-2"/>
+          {mutation.isPending ? "Preparing..." : "Print Premium Stickers"}
         </Button>
+
+        <p className="text-xs text-center">
+          Available: {printableCount}
+        </p>
 
       </CardContent>
     </Card>
   );
-};
-
-export default BulkStickerPrintCard;
+}
