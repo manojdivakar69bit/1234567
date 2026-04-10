@@ -23,6 +23,7 @@ const AdminPanel = () => {
 
   // --- STATES ---
   const [qrCount, setQrCount] = useState(10);
+  const [settingsForm, setSettingsForm] = useState({ qr_price: "", agent_commission: "", salesman_commission: "" });
   const [assignFrom, setAssignFrom] = useState("");
   const [assignTo, setAssignTo] = useState("");
   const [assignAgentId, setAssignAgentId] = useState("");
@@ -68,6 +69,59 @@ const AdminPanel = () => {
       return data;
     },
   });
+
+  const { data: appSettings = [] } = useQuery({
+    queryKey: ["app_settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("app_settings").select("*");
+      if (error) throw error;
+      return data;
+    },
+    meta: {
+      onSettled: (data: any) => {
+        if (data) {
+          const map: any = {};
+          data.forEach((s: any) => { map[s.key] = s.value; });
+          setSettingsForm({
+            qr_price: map.qr_price || "70",
+            agent_commission: map.agent_commission || "5",
+            salesman_commission: map.salesman_commission || "15",
+          });
+        }
+      }
+    }
+  });
+
+  // Sync settings form when data loads
+  const settingsMap: Record<string, string> = {};
+  appSettings.forEach((s: any) => { settingsMap[s.key] = s.value; });
+  if (settingsForm.qr_price === "" && appSettings.length > 0) {
+    setSettingsForm({
+      qr_price: settingsMap.qr_price || "70",
+      agent_commission: settingsMap.agent_commission || "5",
+      salesman_commission: settingsMap.salesman_commission || "15",
+    });
+  }
+
+  const saveSettingsMutation = useMutation({
+    mutationFn: async () => {
+      const keys = ["qr_price", "agent_commission", "salesman_commission"] as const;
+      for (const key of keys) {
+        const { error } = await supabase.from("app_settings").upsert({ key, value: settingsForm[key] }, { onConflict: "key" });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["app_settings"] });
+      toast.success("Settings Saved!");
+    },
+    onError: () => toast.error("Failed to save settings"),
+  });
+
+  const qrPrice = Number(settingsForm.qr_price) || 0;
+  const agentComm = Number(settingsForm.agent_commission) || 0;
+  const salesmanComm = Number(settingsForm.salesman_commission) || 0;
+  const adminShare = qrPrice - agentComm - salesmanComm;
 
   const approvedAgents = agents.filter((a: any) => a.approval_status === "approved");
 
@@ -302,6 +356,41 @@ const AdminPanel = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* PRICING & COMMISSION CONTROL */}
+      <Card className="border-green-100 shadow-sm">
+        <CardHeader className="py-3 bg-green-50/50 border-b">
+          <CardTitle className="text-sm flex items-center gap-2"><IndianRupee size={16} className="text-green-600"/> Pricing & Commission Control</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label className="text-xs font-bold text-slate-600">QR Price (₹)</Label>
+              <Input type="number" value={settingsForm.qr_price} onChange={e => setSettingsForm({ ...settingsForm, qr_price: e.target.value })} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-slate-600">Agent Commission (₹)</Label>
+              <Input type="number" value={settingsForm.agent_commission} onChange={e => setSettingsForm({ ...settingsForm, agent_commission: e.target.value })} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-slate-600">Salesman Commission (₹)</Label>
+              <Input type="number" value={settingsForm.salesman_commission} onChange={e => setSettingsForm({ ...settingsForm, salesman_commission: e.target.value })} className="mt-1" />
+            </div>
+          </div>
+          <div className="p-3 rounded-lg bg-slate-50 border text-sm font-mono text-center">
+            <span className="font-bold text-blue-700">₹{qrPrice}</span>
+            <span className="text-slate-400 mx-1">→</span>
+            <span className="text-orange-600">₹{agentComm} agent</span>
+            <span className="text-slate-400 mx-1">+</span>
+            <span className="text-purple-600">₹{salesmanComm} salesman</span>
+            <span className="text-slate-400 mx-1">+</span>
+            <span className={`font-bold ${adminShare >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{adminShare} yours</span>
+          </div>
+          <Button onClick={() => saveSettingsMutation.mutate()} className="w-full bg-green-600 hover:bg-green-700" disabled={saveSettingsMutation.isPending}>
+            {saveSettingsMutation.isPending ? "Saving..." : "Save All Settings"}
+          </Button>
+        </CardContent>
+      </Card>
 
       <BulkStickerPrintCard baseUrl={window.location.origin} printableCount={qrCodes.filter(q => q.status !== 'activated').length} />
       <PrintHistoryCard />
