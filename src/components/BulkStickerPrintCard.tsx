@@ -17,21 +17,15 @@ interface Props {
   printableCount: number;
 }
 
-// ✅ Image ko Base64 mein convert karo
-const imageToBase64 = (url: string): Promise<string> => {
+// ✅ Fetch API se Base64 — CORS safe
+const imageToBase64ViaFetch = async (url: string): Promise<string> => {
+  const res = await fetch(url);
+  const blob = await res.blob();
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
-      ctx?.drawImage(img, 0, 0);
-      resolve(canvas.toDataURL("image/png"));
-    };
-    img.onerror = () => reject(new Error("Image load failed"));
-    img.src = url;
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
   });
 };
 
@@ -151,8 +145,8 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
 
   const mutation = useMutation({
     mutationFn: async () => {
-      // ✅ Pehle image Base64 mein convert karo
-      const bgBase64 = await imageToBase64(`${baseUrl}/sticker-bg.png`);
+      // ✅ Fetch API se Base64
+      const bgBase64 = await imageToBase64ViaFetch(`${baseUrl}/sticker-bg.png`);
 
       const { data, error } = await supabase
         .from("qr_codes")
@@ -167,7 +161,7 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
       openStickerPrintWindow(codes, bgBase64, baseUrl);
       toast.success("Premium stickers ready!");
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(`Error: ${e.message}`),
   });
 
   return (
