@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -29,9 +29,7 @@ const AdminPanel = () => {
   const [assignAgentId, setAssignAgentId] = useState("");
   const [agentForm, setAgentForm] = useState({ name: "", phone: "", email: "", password: "", bank: "", acc: "", ifsc: "" });
   const [salesmanForm, setSalesmanForm] = useState({ name: "", phone: "", email: "", password: "", bank: "", acc: "", ifsc: "" });
-  const [resetPasswords, setResetPasswords] = useState({});
-  const [pwdForm, setPwdForm] = useState({ current: "", new: "", confirm: "" });
-  const [userResetData, setUserResetData] = useState({ id: "", newPwd: "" });
+  const [resetPasswords, setResetPasswords] = useState<Record<string, string>>({});
 
   // --- QUERIES ---
   const { data: qrCodes = [] } = useQuery({
@@ -64,7 +62,6 @@ const AdminPanel = () => {
   const { data: allPayments = [] } = useQuery({
     queryKey: ["all_payments"],
     queryFn: async () => {
-      // Yahan se saara payment data aayega (Any amount, not just 500)
       const { data, error } = await supabase.from("payments").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -77,35 +74,23 @@ const AdminPanel = () => {
       const { data, error } = await supabase.from("app_settings").select("*");
       if (error) throw error;
       return data;
-    },
-    meta: {
-      onSettled: (data: any) => {
-        if (data) {
-          const map: any = {};
-          data.forEach((s: any) => { map[s.key] = s.value; });
-          setSettingsForm({
-            qr_price: map.qr_price || "70",
-            agent_commission: map.agent_commission || "5",
-            salesman_commission: map.salesman_commission || "15",
-          });
-        }
-      }
     }
   });
 
   // Sync settings form when data loads
   useEffect(() => {
-  if (appSettings.length > 0) {
-    const map: any = {};
-    appSettings.forEach((s: any) => { map[s.key] = s.value; });
-    setSettingsForm({
-      qr_price: map.qr_price || "70",
-      agent_commission: map.agent_commission || "5",
-      salesman_commission: map.salesman_commission || "15",
-    });
-  }
-}, [appSettings.length]);
+    if (appSettings && appSettings.length > 0) {
+      const map: any = {};
+      appSettings.forEach((s: any) => { map[s.key] = s.value; });
+      setSettingsForm({
+        qr_price: map.qr_price || "70",
+        agent_commission: map.agent_commission || "5",
+        salesman_commission: map.salesman_commission || "15",
+      });
+    }
+  }, [appSettings]);
 
+  // --- MUTATIONS ---
   const saveSettingsMutation = useMutation({
     mutationFn: async () => {
       const keys = ["qr_price", "agent_commission", "salesman_commission"] as const;
@@ -128,7 +113,6 @@ const AdminPanel = () => {
 
   const approvedAgents = agents.filter((a: any) => a.approval_status === "approved");
 
-  // --- MUTATIONS ---
   const addAgentMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke("create-agent", { 
@@ -157,7 +141,7 @@ const AdminPanel = () => {
     }
   });
 
-    const deleteUserMutation = useMutation({
+  const deleteUserMutation = useMutation({
     mutationFn: async ({ id, type }: { id: string, type: 'agent' | 'salesman' }) => {
       const table = type === 'agent' ? 'agents' : 'salesmen';
       const { error } = await supabase.from(table).delete().eq("id", id);
@@ -171,7 +155,7 @@ const AdminPanel = () => {
 
   const resetUserPasswordMutation = useMutation({
     mutationFn: async ({ userId, newPassword }: { userId: string, newPassword: string }) => {
-      if (!newPassword || newPassword.length < 6) throw new Error("Min 6 characters");
+      if (!newPassword || newPassword.length < 6) throw new Error("Min 6 characters required");
       const { error } = await supabase.functions.invoke("reset-user-password", {
         body: { userId, newPassword }
       });
@@ -183,7 +167,7 @@ const AdminPanel = () => {
     },
     onError: (e: any) => toast.error(e.message)
   });
-}
+
   const generateQrMutation = useMutation({
     mutationFn: async (count: number) => {
       const { data: existing } = await supabase.from("qr_codes").select("code").order("code", { ascending: false }).limit(1);
@@ -226,7 +210,7 @@ const AdminPanel = () => {
         </Button>
       </div>
 
-      {/* STATS - Ismein total collection dynamically calculation hogi */}
+      {/* STATS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4 border-l-4 border-l-blue-600 shadow-sm">
           <div className="text-2xl font-bold">{qrCodes.length}</div>
@@ -241,29 +225,21 @@ const AdminPanel = () => {
           <div className="text-xs text-muted-foreground uppercase font-bold">Activated</div>
         </Card>
         <Card className="p-4 border-l-4 border-l-orange-500 shadow-sm bg-orange-50/30">
-          {/* Yahan koi bhi amount ho, uska sum dikhega */}
           <div className="text-2xl font-black text-orange-700">₹{allPayments.reduce((acc, p) => acc + Number(p.amount), 0)}</div>
           <div className="text-xs text-orange-900 uppercase font-bold">Total Collection</div>
         </Card>
       </div>
 
-      {/* PAYMENT HISTORY TABLE - ALL AMOUNTS */}
+      {/* TRANSACTION TABLE */}
       <Card className="border-slate-200 shadow-sm overflow-hidden">
         <CardHeader className="bg-slate-100/50 py-3 border-b flex flex-row items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <IndianRupee size={18} className="text-green-600"/> All Transactions History
-          </CardTitle>
+          <CardTitle className="text-base flex items-center gap-2"><IndianRupee size={18} className="text-green-600"/> Transactions</CardTitle>
           <Badge variant="secondary">{allPayments.length} Payments</Badge>
         </CardHeader>
         <CardContent className="p-0 max-h-80 overflow-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 text-[10px] uppercase text-slate-500 sticky top-0">
-              <tr>
-                <th className="p-3">Customer Name</th>
-                <th className="p-3">Amount</th>
-                <th className="p-3">Collected By</th>
-                <th className="p-3 text-right">Date & Time</th>
-              </tr>
+              <tr><th className="p-3">Customer</th><th className="p-3">Amount</th><th className="p-3">Collected By</th><th className="p-3 text-right">Date</th></tr>
             </thead>
             <tbody>
               {allPayments.map((p: any) => (
@@ -272,27 +248,21 @@ const AdminPanel = () => {
                   <td className="p-3 font-mono font-bold text-blue-600">₹{p.amount}</td>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
-                      <Badge className="text-[9px] h-4 bg-slate-200 text-slate-700 hover:bg-slate-200 border-none">
-                        {p.collector_type?.toUpperCase() || 'USER'}
-                      </Badge>
-                      <span className="font-medium text-slate-700">{p.collector_name || "Unknown"}</span>
+                      <Badge className="text-[9px] h-4 bg-slate-200 text-slate-700">{p.collector_type?.toUpperCase() || 'USER'}</Badge>
+                      <span className="font-medium">{p.collector_name || "Unknown"}</span>
                     </div>
                   </td>
-                  <td className="p-3 text-right text-[10px] text-muted-foreground font-mono">
-                    {new Date(p.created_at).toLocaleString('en-IN')}
-                  </td>
+                  <td className="p-3 text-right text-[10px] text-muted-foreground">{new Date(p.created_at).toLocaleString('en-IN')}</td>
                 </tr>
               ))}
-              {allPayments.length === 0 && (
-                <tr><td colSpan={4} className="p-10 text-center text-slate-400 italic">No payments found in database.</td></tr>
-              )}
             </tbody>
           </table>
         </CardContent>
       </Card>
 
-      {/* AGENT & SALESMAN CONTROL */}
+      {/* LISTS WITH PASSWORD RESET */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* AGENTS LIST */}
         <Card className="border-slate-200 shadow-sm overflow-hidden">
           <CardHeader className="bg-slate-50 py-3 border-b"><CardTitle className="text-sm font-bold flex items-center gap-2"><Users size={16}/> Agents List</CardTitle></CardHeader>
           <CardContent className="p-0 max-h-60 overflow-auto">
@@ -305,29 +275,27 @@ const AdminPanel = () => {
                   <tr key={a.id} className="border-b">
                     <td className="p-3 font-medium">{a.name}</td>
                     <td className="p-3">
-  <div className="flex gap-1">
-    <Input 
-      placeholder="New Pwd" 
-      type="password" 
-      className="h-8 text-xs w-24" 
-      value={resetPasswords[a.id] || ""}
-      onChange={e => setResetPasswords({...resetPasswords, [a.id]: e.target.value})}
-    />
-    <Button 
-      size="sm" 
-      variant="secondary" 
-      className="h-8 px-2"
-      onClick={() => resetUserPasswordMutation.mutate({ userId: a.user_id, newPassword: resetPasswords[a.id] })}
-    >
-      <Lock size={12}/>
-    </Button>
-  </div>
-</td>
-                    
-                    <td className="p-3">
-                      <div className="flex gap-1"><Input placeholder="New" type="password" className="h-7 text-[10px] w-20" onChange={e=>setUserResetData({id:a.id, newPwd:e.target.value})}/><Button size="sm" className="h-7 px-2" onClick={()=>toast.success("Password Updated")}><Lock size={12}/></Button></div>
+                      <div className="flex gap-1">
+                        <Input 
+                          placeholder="New Pwd" 
+                          type="password" 
+                          className="h-8 text-xs w-24" 
+                          value={resetPasswords[a.id] || ""}
+                          onChange={e => setResetPasswords({...resetPasswords, [a.id]: e.target.value})}
+                        />
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          className="h-8 px-2"
+                          onClick={() => resetUserPasswordMutation.mutate({ userId: a.user_id, newPassword: resetPasswords[a.id] })}
+                        >
+                          <Lock size={12}/>
+                        </Button>
+                      </div>
                     </td>
-                    <td className="p-3 text-center"><Button variant="ghost" size="sm" className="text-red-500 h-8 w-8 p-0" onClick={()=>{if(confirm("Delete Agent?")) deleteUserMutation.mutate({id:a.id, type:'agent'})}}><Trash2 size={16}/></Button></td>
+                    <td className="p-3 text-center">
+                      <Button variant="ghost" size="sm" className="text-red-500 h-8 p-0" onClick={()=>{if(confirm("Delete Agent?")) deleteUserMutation.mutate({id:a.id, type:'agent'})}}><Trash2 size={16}/></Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -335,6 +303,7 @@ const AdminPanel = () => {
           </CardContent>
         </Card>
 
+        {/* SALESMEN LIST */}
         <Card className="border-slate-200 shadow-sm overflow-hidden">
           <CardHeader className="bg-slate-50 py-3 border-b"><CardTitle className="text-sm font-bold flex items-center gap-2"><UserCheck size={16}/> Salesmen List</CardTitle></CardHeader>
           <CardContent className="p-0 max-h-60 overflow-auto">
@@ -347,9 +316,27 @@ const AdminPanel = () => {
                   <tr key={s.id} className="border-b">
                     <td className="p-3 font-medium">{s.name}</td>
                     <td className="p-3">
-                      <div className="flex gap-1"><Input placeholder="New" type="password" className="h-7 text-[10px] w-20" onChange={e=>setUserResetData({id:s.id, newPwd:e.target.value})}/><Button size="sm" variant="secondary" className="h-7 px-2" onClick={()=>toast.success("Password Updated")}><Lock size={12}/></Button></div>
+                      <div className="flex gap-1">
+                        <Input 
+                          placeholder="New Pwd" 
+                          type="password" 
+                          className="h-8 text-xs w-24" 
+                          value={resetPasswords[s.id] || ""}
+                          onChange={e => setResetPasswords({...resetPasswords, [s.id]: e.target.value})}
+                        />
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          className="h-8 px-2"
+                          onClick={() => resetUserPasswordMutation.mutate({ userId: s.user_id, newPassword: resetPasswords[s.id] })}
+                        >
+                          <Lock size={12}/>
+                        </Button>
+                      </div>
                     </td>
-                    <td className="p-3 text-center"><Button variant="ghost" size="sm" className="text-red-500 h-8 w-8 p-0" onClick={()=>{if(confirm("Delete Salesman?")) deleteUserMutation.mutate({id:s.id, type:'salesman'})}}><Trash2 size={16}/></Button></td>
+                    <td className="p-3 text-center">
+                      <Button variant="ghost" size="sm" className="text-red-500 h-8 p-0" onClick={()=>{if(confirm("Delete Salesman?")) deleteUserMutation.mutate({id:s.id, type:'salesman'})}}><Trash2 size={16}/></Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -395,38 +382,21 @@ const AdminPanel = () => {
         </Card>
       </div>
 
-      {/* PRICING & COMMISSION CONTROL */}
+      {/* PRICING CONTROL */}
       <Card className="border-green-100 shadow-sm">
         <CardHeader className="py-3 bg-green-50/50 border-b">
-          <CardTitle className="text-sm flex items-center gap-2"><IndianRupee size={16} className="text-green-600"/> Pricing & Commission Control</CardTitle>
+          <CardTitle className="text-sm flex items-center gap-2"><IndianRupee size={16} className="text-green-600"/> Pricing & Commission</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 pt-4">
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label className="text-xs font-bold text-slate-600">QR Price (₹)</Label>
-              <Input type="number" value={settingsForm.qr_price} onChange={e => setSettingsForm({ ...settingsForm, qr_price: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-xs font-bold text-slate-600">Agent Commission (₹)</Label>
-              <Input type="number" value={settingsForm.agent_commission} onChange={e => setSettingsForm({ ...settingsForm, agent_commission: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-xs font-bold text-slate-600">Salesman Commission (₹)</Label>
-              <Input type="number" value={settingsForm.salesman_commission} onChange={e => setSettingsForm({ ...settingsForm, salesman_commission: e.target.value })} className="mt-1" />
-            </div>
+            <div><Label className="text-xs font-bold">QR Price</Label><Input type="number" value={settingsForm.qr_price} onChange={e => setSettingsForm({ ...settingsForm, qr_price: e.target.value })} /></div>
+            <div><Label className="text-xs font-bold">Agent ₹</Label><Input type="number" value={settingsForm.agent_commission} onChange={e => setSettingsForm({ ...settingsForm, agent_commission: e.target.value })} /></div>
+            <div><Label className="text-xs font-bold">Salesman ₹</Label><Input type="number" value={settingsForm.salesman_commission} onChange={e => setSettingsForm({ ...settingsForm, salesman_commission: e.target.value })} /></div>
           </div>
-          <div className="p-3 rounded-lg bg-slate-50 border text-sm font-mono text-center">
-            <span className="font-bold text-blue-700">₹{qrPrice}</span>
-            <span className="text-slate-400 mx-1">→</span>
-            <span className="text-orange-600">₹{agentComm} agent</span>
-            <span className="text-slate-400 mx-1">+</span>
-            <span className="text-purple-600">₹{salesmanComm} salesman</span>
-            <span className="text-slate-400 mx-1">+</span>
-            <span className={`font-bold ${adminShare >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{adminShare} yours</span>
+          <div className="p-3 rounded-lg bg-slate-50 border text-center font-mono">
+            <span className="text-blue-700">₹{qrPrice}</span> → <span className="text-orange-600">₹{agentComm}</span> + <span className="text-purple-600">₹{salesmanComm}</span> + <span className="text-green-600">₹{adminShare} You</span>
           </div>
-          <Button onClick={() => saveSettingsMutation.mutate()} className="w-full bg-green-600 hover:bg-green-700" disabled={saveSettingsMutation.isPending}>
-            {saveSettingsMutation.isPending ? "Saving..." : "Save All Settings"}
-          </Button>
+          <Button onClick={() => saveSettingsMutation.mutate()} className="w-full bg-green-600 hover:bg-green-700">Save Settings</Button>
         </CardContent>
       </Card>
 
