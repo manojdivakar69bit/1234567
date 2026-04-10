@@ -93,15 +93,17 @@ const AdminPanel = () => {
   });
 
   // Sync settings form when data loads
-  const settingsMap: Record<string, string> = {};
-  appSettings.forEach((s: any) => { settingsMap[s.key] = s.value; });
-  if (settingsForm.qr_price === "" && appSettings.length > 0) {
+  useEffect(() => {
+  if (appSettings.length > 0) {
+    const map: any = {};
+    appSettings.forEach((s: any) => { map[s.key] = s.value; });
     setSettingsForm({
-      qr_price: settingsMap.qr_price || "70",
-      agent_commission: settingsMap.agent_commission || "5",
-      salesman_commission: settingsMap.salesman_commission || "15",
+      qr_price: map.qr_price || "70",
+      agent_commission: map.agent_commission || "5",
+      salesman_commission: map.salesman_commission || "15",
     });
   }
+}, [appSettings.length]);
 
   const saveSettingsMutation = useMutation({
     mutationFn: async () => {
