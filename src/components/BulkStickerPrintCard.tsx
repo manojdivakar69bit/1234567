@@ -95,14 +95,15 @@ body {
   justify-content: center;
 }
 .qr-wrap {
-  width: 90%;
-  height: 90%;
-  background: white;
-  border-radius: 5px;
-  padding: 4px;
+  width: 88%;
+  height: 88%;
+  background: transparent;
+  border-radius: 8px;
+  padding: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 0 8px rgba(0,0,0,0.6); 
 }
 .qr-wrap svg {
   width: 100% !important;
