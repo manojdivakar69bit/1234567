@@ -18,7 +18,7 @@ interface Props {
 }
 
 /* ================== 🔥 PREMIUM PRINT FUNCTION ================== */
-
+const BG_IMAGE = "/sticker-bg.png";
 const openStickerPrintWindow = (codes: string[], baseUrl: string) => {
 
   const stickers = codes.map((code) => {
