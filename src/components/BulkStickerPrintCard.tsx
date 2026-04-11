@@ -99,7 +99,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
   }
   .code-label {
     position: absolute;
-    bottom: 0.85cm;
+    bottom: 0.75cm;
     left: 50%;
     transform: translateX(-50%);
     font-family: 'Arial Black', Arial, sans-serif;
