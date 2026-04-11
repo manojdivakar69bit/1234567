@@ -115,6 +115,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     padding: 6px;
     box-shadow: 0 0 12px rgba(66,133,244,0.15);
     margin: 0;
+    margin-top: -20px;
   }
   .qr-container svg { width: 3.3cm !important; height: 3.3cm !important; display: block; }
   .code-label {
