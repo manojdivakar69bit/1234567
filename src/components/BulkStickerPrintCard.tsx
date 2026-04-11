@@ -60,8 +60,8 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-start;
-    gap: 4mm;
-    padding: 6mm;
+    gap: 2mm;
+    padding: 3mm;
   }
   .sticker {
     width: 6.5cm;
@@ -80,7 +80,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
   }
   .qr-area {
     position: absolute;
-    top: 49%;
+    top: 30%;
     left: 50%;
     transform: translate(-50%, -50%);
     background: white;
