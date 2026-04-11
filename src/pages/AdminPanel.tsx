@@ -219,7 +219,7 @@ const AdminPanel = () => {
       {/* HEADER */}
       <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain" />
+          <img src="/logo.png" alt="Logo" className="w-40 h-40 object-contain" />
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2 tracking-tight">
             <Settings className="text-blue-600" /> DASHBOARD ADMIN
           </h1>
