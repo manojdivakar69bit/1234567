@@ -46,11 +46,14 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
 
     return `
     <div class="sticker">
-      <img src="${bgBase64}" class="bg-img" />
-      <div class="qr-overlay">
-        <div class="qr-wrap">${qr}</div>
+      <div class="header">SCAN IN EMERGENCY</div>
+      <div class="brand-section">
+        <img src="${bgBase64 || ''}" class="brand-logo" alt="logo" />
+        <div class="brand-name">Call My<br/>Family</div>
       </div>
+      <div class="qr-container">${qr}</div>
       <div class="code-label">${code}</div>
+      <div class="footer">Protected by CallMyFamily</div>
     </div>`;
   }).join("");
 
@@ -60,58 +63,80 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
 <meta charset="UTF-8">
 <style>
   @page { margin: 5mm; size: A4; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body {
     background: #f5f5f5;
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-start;
-    gap: 8mm;
-    padding: 10mm;
-    -webkit-print-color-adjust: exact;
+    gap: 6mm;
+    padding: 8mm;
   }
   .sticker {
-    position: relative;
     width: 6.0cm;
-    height: 7.8cm;
-    background: white;
-    border-radius: 4px;
+    height: 8.0cm;
+    background: linear-gradient(180deg, #f8f8f8 0%, #fff 30%, #fff 70%, #f8f8f8 100%);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
   }
-  .bg-img {
+  .header {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: white;
     width: 100%;
-    height: 100%;
-    object-fit: fill;
-    display: block;
-  }
-  .qr-overlay {
-    position: absolute;
-    top: 42.8%; /* QR ke dabbe ka center */
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 55%; /* QR ki width */
-    aspect-ratio: 1/1;
-    background: white;
-    padding: 6px;
-    border-radius: 8px;
-    box-shadow: 0 0 12px rgba(66, 133, 244, 0.5); /* Blue glow */
-  }
-  .qr-wrap svg {
-    width: 100% !important;
-    height: 100% !important;
-    display: block;
-  }
-  .code-label {
-    position: absolute;
-    bottom: 12.5%; /* ID number ki sahi jagah */
-    left: 0;
-    right: 0;
     text-align: center;
+    padding: 0.3cm 0.2cm;
     font-family: Arial, sans-serif;
-    font-size: 22px;
+    font-weight: 900;
+    font-size: 12pt;
+    letter-spacing: 2px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+  }
+  .brand-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0.2cm 0;
+  }
+  .brand-logo { height: 36px; width: auto; }
+  .brand-name {
+    font-family: Arial, sans-serif;
+    font-size: 16pt;
     font-weight: 900;
     color: #1a365d;
-    letter-spacing: 0.5px;
+    line-height: 1.1;
+  }
+  .qr-container {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 6px;
+    box-shadow: 0 0 12px rgba(66,133,244,0.15);
+    margin: 0.1cm 0;
+  }
+  .qr-container svg { width: 3.2cm !important; height: 3.2cm !important; display: block; }
+  .code-label {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: 14pt;
+    font-weight: 900;
+    color: #1a365d;
+    letter-spacing: 1px;
+    margin: 0.1cm 0;
+  }
+  .footer {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: white;
+    width: 100%;
+    text-align: center;
+    padding: 0.18cm;
+    font-family: Arial, sans-serif;
+    font-size: 8pt;
+    font-weight: 600;
+    margin-top: auto;
   }
   @media print {
     body { background: white; padding: 0; gap: 4mm; }
