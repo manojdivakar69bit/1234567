@@ -99,9 +99,9 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 0.2cm 0;
+    padding: 0.1cm 0;
   }
-  .brand-logo { height: 150px; width: auto; }
+  .brand-logo { height: 100px; width: auto; }
   .brand-name {
     font-family: Arial, sans-serif;
     font-size: 16pt;
