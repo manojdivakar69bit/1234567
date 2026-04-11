@@ -11,16 +11,16 @@ interface PrintableStickerProps {
   baseUrl: string;
   stickerWidth?: number;
   stickerHeight?: number;
-    logoUrl?: string
+  logoUrl?: string;
 }
 
- const PrintableSticker = ({ 
-  code, 
-  baseUrl, 
-  orgName = "Call My Family 👍", 
-  stickerWidth = 6, 
+const PrintableSticker = ({
+  code,
+  baseUrl,
+  orgName = "Call My Family",
+  stickerWidth = 6,
   stickerHeight = 8,
-  logoUrl   //
+  logoUrl,
 }: PrintableStickerProps) => {
   const handlePrint = () => {
     const url = `${baseUrl}/emergency/${code}`;
@@ -28,103 +28,121 @@ interface PrintableStickerProps {
     const hCm = stickerHeight;
 
     const qrMarkup = renderToStaticMarkup(
-      <QRCodeSVG 
-        value={url} 
-        size={Math.min(wCm, hCm) * 27} 
-        level="H" 
-        includeMargin={true} 
+      <QRCodeSVG
+        value={url}
+        size={Math.min(wCm, hCm) * 30}
+        level="H"
+        includeMargin={false}
+        imageSettings={{
+          src: `${window.location.origin}/logo.png`,
+          x: undefined,
+          y: undefined,
+          height: 36,
+          width: 36,
+          excavate: true,
+        }}
       />
     );
-    const logo = logoUrl || "/logo.png";
+
     const stickerHtml = `<!DOCTYPE html>
 <html><head><title>QR Sticker - ${code}</title>
 <style>
-  * { 
-    -webkit-print-color-adjust: exact !important; 
-    print-color-adjust: exact !important; 
-    color-adjust: exact !important; 
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    margin: 0; padding: 0; box-sizing: border-box;
   }
   @page { size: ${wCm}cm ${hCm}cm; margin: 0; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { 
-    font-family: Arial, sans-serif; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    min-height: 100vh; 
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
     background: white;
   }
-  .sticker { 
-    width: ${wCm}cm; 
-    height: ${hCm}cm; 
-    border: 1px solid #ddd; 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    padding: 0.35cm; 
-    background: white;
+  .sticker {
+    width: ${wCm}cm;
+    height: ${hCm}cm;
+    background: linear-gradient(180deg, #f8f8f8 0%, #ffffff 30%, #ffffff 70%, #f8f8f8 100%);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+    position: relative;
   }
-  .header { 
-    background: #dc2626; 
-    color: white; 
-    width: 100%; 
-    text-align: center; 
-    padding: 0.25cm 0.2cm; 
-    font-weight: bold; 
-    font-size: ${Math.max(9.5, wCm * 2.3)}pt; 
-    border-radius: 6px;
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
+  .header {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    color: white;
+    width: 100%;
+    text-align: center;
+    padding: 0.3cm 0.2cm;
+    font-weight: 900;
+    font-size: ${Math.max(11, wCm * 2.5)}pt;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+  }
+  .brand-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 8px;
-    margin-bottom: 0.35cm;
+    padding: 0.25cm 0;
   }
-  .header img { 
-    height: 26px; 
-    width: auto; 
-    background: white; 
-    border-radius: 4px; 
-    padding: 3px; 
+  .brand-logo {
+    height: 42px;
+    width: auto;
   }
-  .scan-text { 
-    font-size: ${Math.max(7.5, wCm * 1.35)}pt; 
-    color: #444; 
-    text-transform: uppercase; 
-    letter-spacing: 1.3px; 
-    margin-bottom: 0.4cm;
-    font-weight: 500;
+  .brand-name {
+    font-size: ${Math.max(14, wCm * 3.2)}pt;
+    font-weight: 900;
+    color: #1a365d;
+    line-height: 1.1;
   }
-  .qr { 
-    flex: 1; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    margin: 0.1cm 0;
+  .qr-container {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 8px;
+    box-shadow: 0 0 15px rgba(66, 133, 244, 0.15);
+    margin: 0.15cm 0;
   }
-  .code { 
-    font-family: monospace; 
-    font-size: ${Math.max(9.5, wCm * 2.1)}pt; 
-    font-weight: bold; 
-    color: #222; 
-    margin: 0.25cm 0 0.15cm 0;
+  .qr-container svg {
+    display: block;
   }
-  .footer { 
-    background: #dc2626; 
-    color: white; 
-    width: 100%; 
-    text-align: center; 
-    padding: 0.18cm; 
-    font-size: ${Math.max(6, wCm * 1.15)}pt; 
-    border-radius: 6px;
-    margin-top: 0.2cm;
+  .code-label {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-size: ${Math.max(12, wCm * 2.8)}pt;
+    font-weight: 900;
+    color: #1a365d;
+    letter-spacing: 1px;
+    margin: 0.15cm 0;
   }
-  @media print { body { margin: 0; } }
+  .footer {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    color: white;
+    width: 100%;
+    text-align: center;
+    padding: 0.2cm;
+    font-size: ${Math.max(7, wCm * 1.3)}pt;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-top: auto;
+  }
+  @media print { body { margin: 0; } .sticker { box-shadow: none; } }
 </style></head><body>
 <div class="sticker">
-  <div class="header"><img src="${window.location.origin}/logo.png" alt="logo" /><span>${orgName}</span></div>
-  <div class="scan-text">SCAN IN EMERGENCY</div>
-  <div class="qr">${qrMarkup}</div>
-  <div class="code">${code}</div>
+  <div class="header">Scan in Emergency</div>
+  <div class="brand-section">
+    <img src="${window.location.origin}/logo.png" class="brand-logo" alt="logo" />
+    <div class="brand-name">Call My<br/>Family</div>
+  </div>
+  <div class="qr-container">${qrMarkup}</div>
+  <div class="code-label">${code}</div>
   <div class="footer">Protected by CallMyFamily</div>
 </div>
 <script>window.onload = function() { window.print(); }</script>
@@ -147,21 +165,48 @@ interface PrintableStickerProps {
 
   return (
     <div className="space-y-3">
-      <div className="border rounded-lg p-4 text-center space-y-2">
-        <div className="bg-primary text-primary-foreground px-3 py-1 rounded font-bold text-sm flex items-center justify-center gap-2">
-          <img 
-  src={logoUrl || "/logo.png"} 
-  alt="logo" 
-  className="h-5 w-auto bg-white rounded p-0.5" 
-/>
-          <span>{orgName}</span>
+      <div className="border rounded-xl overflow-hidden shadow-lg max-w-[240px] mx-auto">
+        {/* Header */}
+        <div className="emergency-gradient text-primary-foreground px-3 py-2 font-black text-sm text-center tracking-widest uppercase">
+          Scan in Emergency
         </div>
-        <div className="text-xs text-muted-foreground uppercase tracking-wider">SCAN IN EMERGENCY</div>
-        <div className="flex justify-center">
-          <QRCodeSVG value={`${baseUrl}/emergency/${code}`} size={120} level="H" />
+        {/* Brand */}
+        <div className="flex items-center justify-center gap-2 py-2 bg-card">
+          <img
+            src={logoUrl || "/logo.png"}
+            alt="logo"
+            className="h-10 w-auto"
+          />
+          <span className="font-black text-lg leading-tight" style={{ color: 'hsl(var(--navy))' }}>
+            Call My<br />Family
+          </span>
         </div>
-        <div className="font-mono font-bold">{code}</div>
-        <div className="bg-primary text-primary-foreground px-3 py-1 rounded text-xs">Protected by CallMyFamily</div>
+        {/* QR */}
+        <div className="flex justify-center pb-2 bg-card">
+          <div className="border-2 border-border rounded-lg p-2 shadow-sm">
+            <QRCodeSVG
+              value={`${baseUrl}/emergency/${code}`}
+              size={140}
+              level="H"
+              imageSettings={{
+                src: logoUrl || "/logo.png",
+                x: undefined,
+                y: undefined,
+                height: 24,
+                width: 24,
+                excavate: true,
+              }}
+            />
+          </div>
+        </div>
+        {/* Code */}
+        <div className="text-center font-black text-lg tracking-wider pb-2 bg-card" style={{ color: 'hsl(var(--navy))' }}>
+          {code}
+        </div>
+        {/* Footer */}
+        <div className="emergency-gradient text-primary-foreground px-3 py-1.5 text-center text-xs font-semibold tracking-wide">
+          Protected by CallMyFamily
+        </div>
       </div>
       <Button variant="outline" className="w-full" onClick={handlePrint}>
         <Printer size={14} className="mr-1" /> Print Sticker
