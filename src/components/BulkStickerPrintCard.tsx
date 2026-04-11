@@ -9,12 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 
 const PRINT_OPTIONS = ["10", "20", "50", "100", "500", "1000"] as const;
+
+// Sticker Size Config
 const STICKER_SIZES = {
   small: { w: "5cm", h: "7cm", qrSize: "2.5cm", top: "60%" },
   medium: { w: "6.5cm", h: "9cm", qrSize: "3.2cm", top: "65%" }, // Default
   large: { w: "8cm", h: "11cm", qrSize: "4.5cm", top: "68%" }
 };
-
 
 interface Props {
   baseUrl: string;
@@ -36,7 +37,10 @@ const imageToBase64ViaFetch = async (url: string): Promise<string> => {
   }
 };
 
-const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: string) => {
+// ✅ Isme ab 'sizeKey' pass ho raha hai jo CSS badal dega
+const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: string, sizeKey: keyof typeof STICKER_SIZES) => {
+  const config = STICKER_SIZES[sizeKey];
+
   const stickers = codes.map((code) => {
     const qr = renderToStaticMarkup(
       <QRCodeSVG
@@ -70,8 +74,8 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     padding: 3mm;
   }
   .sticker {
-    width: 6.5cm;
-    height: 9cm;
+    width: ${config.w};
+    height: ${config.h};
     background-image: url('${bgBase64}');
     background-size: 100% 100%;
     background-repeat: no-repeat;
@@ -83,20 +87,22 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     justify-content: flex-end;
     position: relative;
     overflow: hidden;
+    border: 0.5px solid #eee;
   }
   .qr-area {
     position: absolute;
-    top: 65%;
+    top: ${config.top};
     left: 50%;
     transform: translate(-50%, -50%);
     background: white;
     border-radius: 8px;
     padding: 4px;
-    width: 4cm;
-    height: 3.7cm;
+    width: ${config.qrSize};
+    height: ${config.qrSize};
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 1px solid #000;
   }
   .qr-area svg {
     width: 100% !important;
@@ -105,11 +111,11 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
   }
   .code-label {
     position: absolute;
-    bottom: 0.78cm;
+    bottom: 0.6cm;
     left: 50%;
     transform: translateX(-50%);
     font-family: 'Arial Black', Arial, sans-serif;
-    font-size: 13pt;
+    font-size: 11pt;
     font-weight: 900;
     color: #1a365d;
     letter-spacing: 1px;
@@ -151,7 +157,8 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
       return { codes: data.map((d: any) => d.code), bgBase64 };
     },
     onSuccess: ({ codes, bgBase64 }) => {
-      openStickerPrintWindow(codes, bgBase64, baseUrl);
+      // ✅ Yahan selectedSize pass ho raha hai
+      openStickerPrintWindow(codes, bgBase64, baseUrl, selectedSize);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -160,12 +167,24 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
     <Card>
       <CardHeader><CardTitle>Print Premium Stickers</CardTitle></CardHeader>
       <CardContent className="space-y-4">
+        {/* Count Selector */}
         <Select value={count} onValueChange={setCount}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder="Quantity" /></SelectTrigger>
           <SelectContent>
             {PRINT_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o} Stickers</SelectItem>)}
           </SelectContent>
         </Select>
+
+        {/* ✅ Size Selector */}
+        <Select value={selectedSize} onValueChange={(v: any) => setSelectedSize(v)}>
+          <SelectTrigger><SelectValue placeholder="Select Size" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="small">Small (5x7 cm)</SelectItem>
+            <SelectItem value="medium">Medium (6.5x9 cm)</SelectItem>
+            <SelectItem value="large">Large (8x11 cm)</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Button onClick={() => mutation.mutate()} className="w-full" disabled={mutation.isPending}>
           {mutation.isPending ? "Preparing..." : "Print Now"}
         </Button>
