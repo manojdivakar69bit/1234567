@@ -173,11 +173,8 @@ const PrintableSticker = ({
           <img
             src={logoUrl || "/logo.png"}
             alt="logo"
-            className="h-10 w-auto"
+            className="h-20 w-auto"
           />
-          <span className="font-black text-lg leading-tight" style={{ color: 'hsl(var(--navy))' }}>
-            Call My<br />Family
-          </span>
         </div>
         {/* QR */}
         <div className="flex justify-center pb-2 bg-card">
