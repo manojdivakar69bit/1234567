@@ -9,6 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 
 const PRINT_OPTIONS = ["10", "20", "50", "100", "500", "1000"] as const;
+const STICKER_SIZES = {
+  small: { w: "5cm", h: "7cm", qrSize: "2.5cm", top: "60%" },
+  medium: { w: "6.5cm", h: "9cm", qrSize: "3.2cm", top: "65%" }, // Default
+  large: { w: "8cm", h: "11cm", qrSize: "4.5cm", top: "68%" }
+};
+
 
 interface Props {
   baseUrl: string;
