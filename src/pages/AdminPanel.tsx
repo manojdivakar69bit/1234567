@@ -218,10 +218,10 @@ const AdminPanel = () => {
 
       {/* HEADER */}
       <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Logo" className="w-40 h-40 object-contain" />
+        <div className="flex items-center gap-1">
+          <img src="/logo.png" alt="Logo" className="w-50 h-50 object-contain" />
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2 tracking-tight">
-            <Settings className="text-blue-600" /> DASHBOARD ADMIN
+            <Settings className="text-blue-600" />ADMIN
           </h1>
         </div>
         <Button variant="outline" size="sm" onClick={handleLogout} className="border-red-200 text-red-600 hover:bg-red-50">
