@@ -101,7 +101,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     gap: 6px;
     padding: 0.2cm 0;
   }
-  .brand-logo { height: 80px; width: auto; }
+  .brand-logo { height: 150px; width: auto; }
   .brand-name {
     font-family: Arial, sans-serif;
     font-size: 16pt;
