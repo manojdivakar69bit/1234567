@@ -136,6 +136,7 @@ ${stickers}
 
 export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props) {
   const [count, setCount] = useState("10");
+  const [selectedSize, setSelectedSize] = useState<keyof typeof STICKER_SIZES>("medium"); 
 
   const mutation = useMutation({
     mutationFn: async () => {
