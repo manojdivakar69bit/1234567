@@ -6,9 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Printer } from "lucide-react";
 
 const PRINT_OPTIONS = ["10", "20", "50", "100", "500", "1000"] as const;
 
@@ -37,7 +35,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     const qr = renderToStaticMarkup(
       <QRCodeSVG
         value={`${baseUrl}/emergency/${code}`}
-        size={256}
+        size={300}
         level="H"
         includeMargin={false}
       />
@@ -45,13 +43,8 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
 
     return `
     <div class="sticker">
-      <div class="header">SCAN IN EMERGENCY</div>
-      <div class="brand-section">
-        <img src="${bgBase64 || ''}" class="brand-logo" alt="logo" />
-      </div>
-      <div class="qr-container">${qr}</div>
+      <div class="qr-area">${qr}</div>
       <div class="code-label">${code}</div>
-      <div class="footer">Protected by CallMyFamily</div>
     </div>`;
   }).join("");
 
@@ -67,78 +60,57 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-start;
-    gap: 6mm;
-    padding: 8mm;
+    gap: 4mm;
+    padding: 6mm;
   }
   .sticker {
-    width: 6.0cm;
-    height: 8.0cm;
-    background: linear-gradient(180deg, #f8f8f8 0%, #fff 30%, #fff 70%, #f8f8f8 100%);
+    width: 6.5cm;
+    height: 9cm;
+    background-image: url('${bgBase64}');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-position: center;
     border-radius: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: flex-end;
+    position: relative;
     overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
   }
-  .header {
-    background: linear-gradient(135deg, #dc2626, #b91c1c);
-    color: white;
-    width: 100%;
-    text-align: center;
-    padding: 0;
-    font-family: Arial, sans-serif;
-    font-weight: 900;
-    font-size: 11pt;
-    letter-spacing: 2px;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-  }
-  .brand-section {
+  .qr-area {
+    position: absolute;
+    top: 49%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 8px;
+    padding: 4px;
+    width: 4.1cm;
+    height: 4.1cm;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
-    margin: -35;
-    line-height: 0;
-    font-size: 0;
   }
-  .brand-logo { 
-    height: 150px; 
-    width: auto;
+  .qr-area svg {
+    width: 100% !important;
+    height: 100% !important;
     display: block;
-    margin-bottom: -15px;
   }
-  .qr-container {
-    background: white;
-    border: 2px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 6px;
-    box-shadow: 0 0 12px rgba(66,133,244,0.15);
-    margin: 0;
-    margin-top: -20px;
-  }
-  .qr-container svg { width: 3.3cm !important; height: 3.3cm !important; display: block; }
   .code-label {
+    position: absolute;
+    bottom: 0.85cm;
+    left: 50%;
+    transform: translateX(-50%);
     font-family: 'Arial Black', Arial, sans-serif;
     font-size: 13pt;
     font-weight: 900;
     color: #1a365d;
     letter-spacing: 1px;
-    margin: 0.08cm 0;
-  }
-  .footer {
-    background: linear-gradient(135deg, #dc2626, #b91c1c);
-    color: white;
-    width: 100%;
-    text-align: center;
-    padding: 0.15cm;
-    font-family: Arial, sans-serif;
-    font-size: 8pt;
-    font-weight: 600;
-    margin-top: auto;
+    white-space: nowrap;
   }
   @media print {
-    body { background: white; padding: 0; gap: 4mm; }
+    body { background: white; padding: 0; gap: 3mm; }
     .sticker { box-shadow: none; page-break-inside: avoid; }
   }
 </style>
@@ -161,14 +133,12 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const bgBase64 = await imageToBase64ViaFetch(`${baseUrl}/logo.png`);
-
+      const bgBase64 = await imageToBase64ViaFetch(`${baseUrl}/sticker-bg.png`);
       const { data, error } = await supabase
         .from("qr_codes")
         .select("code")
         .eq("status", "available")
         .limit(Number(count));
-      
       if (error) throw error;
       if (!data?.length) throw new Error("No available QR codes found!");
       return { codes: data.map((d: any) => d.code), bgBase64 };
