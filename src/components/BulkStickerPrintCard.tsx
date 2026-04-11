@@ -80,7 +80,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
   }
   .qr-area {
     position: absolute;
-    top: 90%;
+    top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     background: white;
