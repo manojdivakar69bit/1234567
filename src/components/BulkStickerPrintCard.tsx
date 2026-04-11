@@ -99,7 +99,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 0.1cm 0;
+    padding: 0.01cm 0;
   }
   .brand-logo { height: 100px; width: auto; }
   .brand-name {
@@ -115,7 +115,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     border-radius: 10px;
     padding: 6px;
     box-shadow: 0 0 12px rgba(66,133,244,0.15);
-    margin: 0.1cm 0;
+    margin: 0.01cm 0;
   }
   .qr-container svg { width: 3.2cm !important; height: 3.2cm !important; display: block; }
   .code-label {
