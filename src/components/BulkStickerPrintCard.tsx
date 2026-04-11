@@ -49,7 +49,6 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
       <div class="header">SCAN IN EMERGENCY</div>
       <div class="brand-section">
         <img src="${bgBase64 || ''}" class="brand-logo" alt="logo" />
-        <div class="brand-name">Call My<br/>Family</div>
       </div>
       <div class="qr-container">${qr}</div>
       <div class="code-label">${code}</div>
@@ -102,7 +101,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     gap: 6px;
     padding: 0.2cm 0;
   }
-  .brand-logo { height: 36px; width: auto; }
+  .brand-logo { height: 80px; width: auto; }
   .brand-name {
     font-family: Arial, sans-serif;
     font-size: 16pt;
