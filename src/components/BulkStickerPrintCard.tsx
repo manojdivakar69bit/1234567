@@ -86,7 +86,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     background: white;
     border-radius: 8px;
     padding: 4px;
-    width: 3.8cm;
+    width: 4cm;
     height: 3.7cm;
     display: flex;
     align-items: center;
