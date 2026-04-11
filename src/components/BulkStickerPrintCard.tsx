@@ -98,10 +98,10 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     align-items: center;
     justify-content: center;
     padding: 0;
-    margin: 0 0 -15px;
+    margin: 0 0 -25px;
   }
   .brand-logo { 
-    height: 95px; 
+    height: 150px; 
     width: auto;
     display: block;
   }
