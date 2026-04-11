@@ -98,7 +98,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     align-items: center;
     justify-content: center;
     padding: 0;
-    margin: 0 0 -25px;
+    margin: 0 0 -35px;
     line-height: 0;
     font-size: 0;
   }
@@ -106,7 +106,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     height: 150px; 
     width: auto;
     display: block;
-    margin-bottom: -8px;
+    margin-bottom: -15px;
   }
   .qr-container {
     background: white;
