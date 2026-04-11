@@ -162,19 +162,16 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
 
   const mutation = useMutation({
     mutationFn: async () => {
-      // ✅ 1. Background image (sticker-bg.png) uthao
-      // Make sure aapke public folder me sticker-bg.png wahi ho jo aapne screenshot me dikhayi hai
-      const bgBase64 = await imageToBase64ViaFetch(`${baseUrl}/sticker-bg.png`);
-      
-      if (!bgBase64) throw new Error("sticker-bg.png not found in public folder!");
+      const bgBase64 = await imageToBase64ViaFetch(`${baseUrl}/logo.png`);
 
       const { data, error } = await supabase
         .from("qr_codes")
         .select("code")
-        .neq("status", "activated")
+        .eq("status", "available")
         .limit(Number(count));
       
       if (error) throw error;
+      if (!data?.length) throw new Error("No available QR codes found!");
       return { codes: data.map((d: any) => d.code), bgBase64 };
     },
     onSuccess: ({ codes, bgBase64 }) => {
