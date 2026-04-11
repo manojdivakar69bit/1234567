@@ -17,40 +17,54 @@ interface Props {
   printableCount: number;
 }
 
-const imageToBase64ViaFetch = async (url: string): Promise<string> => {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error("Image fetch error:", error);
-    return "";
-  }
-};
-
-const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: string) => {
+const openStickerPrintWindow = (codes: string[], baseUrl: string) => {
   const stickers = codes.map((code) => {
-    const qr = renderToStaticMarkup(
+    // 1. Logo SVG ko as markup define karein
+    const familyLogoSvg = `
+      <svg viewBox="0 0 100 100" class="logo-svg">
+        <circle cx="50" cy="50" r="48" fill="#e32626"/>
+        <path d="M50,15 A15,15 0 0,1 65,30 A15,15 0 0,1 50,45 A15,15 0 0,1 35,30 A15,15 0 0,1 50,15 Z" fill="white"/>
+        <path d="M50,48 A22,22 0 0,1 72,70 L28,70 A22,22 0 0,1 50,48 Z" fill="white"/>
+        <path d="M22,50 A10,10 0 0,1 32,60 L12,60 A10,10 0 0,1 22,50 Z" fill="white"/>
+        <path d="M78,50 A10,10 0 0,1 88,60 L68,60 A10,10 0 0,1 78,50 Z" fill="white"/>
+        <path d="M50,5 A5,5 0 0,1 55,10 L45,10 A5,5 0 0,1 50,5 Z" fill="white"/>
+      </svg>
+    `;
+
+    // 2. Logo and text with heart inline markup
+    const logoAndText = `
+      <div class="logo-area">
+        <div class="logo-pin">
+          ${familyLogoSvg}
+          <div class="pin-shadow"></div>
+        </div>
+        <div class="title-text">
+          <span class="call-text">Call My</span>
+          <span class="family-text">Family<span class="heart-text">❤</span></span>
+        </div>
+      </div>
+    `;
+
+    // 3. QR code with its glow wrap
+    const qrMarkup = renderToStaticMarkup(
       <QRCodeSVG
         value={`${baseUrl}/emergency/${code}`}
         size={250}
-        level="H"
+        level="M"
         includeMargin={false}
       />
     );
 
+    const qrWithGlow = `<div class="qr-container-glow">${qrMarkup}</div>`;
+
+    // 4. Return the full HTML structure for one sticker
     return `
-    <div class="sticker">
-      <img src="${bgBase64}" class="bg-img" />
-      <div class="qr-overlay">
-        <div class="qr-wrap">${qr}</div>
-      </div>
-      <div class="code-label">${code}</div>
+    <div class="sticker-card">
+      <div class="top-emergency-bar">SCAN IN EMERGENCY</div>
+      ${logoAndText}
+      ${qrWithGlow}
+      <div class="emr-id-text">${code}</div>
+      <div class="protected-bar">Protected by CallMyFamily</div>
     </div>`;
   }).join("");
 
@@ -58,39 +72,103 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Print Stickers - Call My Family</title>
+<title>Print Call My Family Stickers</title>
 <style>
-  @page { margin: 0.5cm; size: A4; }
+  @page { margin: 0.3cm; size: A4; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    background: #f0f0f0;
+    background: #e0e0e0;
     padding: 10px;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 15px;
+    gap: 12px;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    font-family: 'Inter', 'Roboto', Helvetica, Arial, sans-serif;
   }
-  .sticker {
+  .sticker-card {
     position: relative;
-    width: 6.5cm;  /* Standard Sticker Size */
-    height: 8.5cm;
+    width: 6.8cm;
+    height: 8.8cm;
     background: white;
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   }
-  .bg-img {
+  
+  /* Emergency Bar */
+  .top-emergency-bar {
     position: absolute;
-    top: 0; left: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 14%;
+    background: #e32626; /* Specific red */
+    color: white;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: 0.5px;
+  }
+
+  /* Logo Area */
+  .logo-area {
+    position: absolute;
+    top: 17.5%;
+    left: 10%;
+    right: 10%;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  .logo-pin {
+    width: 60px;
+    height: 60px;
+    position: relative;
+  }
+  .logo-svg {
     width: 100%;
     height: 100%;
-    object-fit: fill;
   }
-  .qr-overlay {
+  .pin-shadow {
     position: absolute;
-    top: 43.5%; /* Adjust based on your background image's white box */
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 8px;
+    background: rgba(3, 102, 214, 0.4);
+    border-radius: 50%;
+  }
+  .title-text {
+    color: #1a1a1a;
+    display: flex;
+    flex-direction: column;
+    font-weight: 800;
+  }
+  .call-text {
+    font-size: 32px;
+    margin-bottom: -5px;
+  }
+  .family-text {
+    font-size: 36px;
+    color: #1a1a1a;
+    position: relative;
+  }
+  .heart-text {
+    color: #e32626;
+    margin-left: 3px;
+    font-size: 0.8em;
+  }
+
+  /* QR Area */
+  .qr-container-glow {
+    position: absolute;
+    top: 55%;
     left: 50%;
     transform: translate(-50%, -50%);
     width: 62%;
@@ -99,34 +177,49 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
     padding: 6px;
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); /* Soft blue glow like image */
+    border-radius: 8px;
+    box-shadow: 0 0 15px 3px rgba(59, 130, 246, 0.4); /* Blueish glow matching image */
   }
-  .qr-wrap {
-    width: 100%;
-    height: 100%;
-  }
-  .qr-wrap svg {
+  .qr-container-glow svg {
     width: 100% !important;
     height: 100% !important;
     display: block;
   }
-  .code-label {
+
+  /* EMR ID */
+  .emr-id-text {
     position: absolute;
-    bottom: 12.8%; /* Matches the "EMR-XXXX" position */
+    bottom: 12%;
     left: 0;
     right: 0;
     text-align: center;
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 800;
-    color: #1e3a8a; /* Dark Blue */
+    color: #1a1a1a;
     letter-spacing: 1px;
   }
+
+  /* Protected Bar */
+  .protected-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 10%;
+    background: #fdf2f2; /* Pale red matching image */
+    color: #cc2525;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
   @media print {
     body { background: none; padding: 0; }
-    .sticker { box-shadow: none; border: 0.1px solid #eee; }
+    .sticker-card { box-shadow: none; border: 0.1px solid #eee; }
   }
 </style>
 </head>
@@ -155,14 +248,7 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
 
   const mutation = useMutation({
     mutationFn: async () => {
-      // 1. Image ko base64 mein convert karein taaki print window mein dikhe
-      const bgBase64 = await imageToBase64ViaFetch(`${baseUrl}/sticker-bg.png`);
-      
-      if (!bgBase64) {
-        throw new Error("Background image (sticker-bg.png) not found in public folder");
-      }
-
-      // 2. Database se non-activated codes lein
+      // 1. Database se non-activated codes lein
       const { data, error } = await supabase
         .from("qr_codes")
         .select("code")
@@ -172,29 +258,29 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
       if (error) throw error;
       if (!data || data.length === 0) throw new Error("No available QR codes found");
 
-      return { codes: data.map((d: any) => d.code), bgBase64 };
+      return { codes: data.map((d: any) => d.code) };
     },
-    onSuccess: ({ codes, bgBase64 }) => {
-      openStickerPrintWindow(codes, bgBase64, baseUrl);
-      toast.success(`${codes.length} Stickers ready for printing!`);
+    onSuccess: ({ codes }) => {
+      openStickerPrintWindow(codes, baseUrl);
+      toast.success(`${codes.length} Stickers are ready for printing!`);
     },
     onError: (e: any) => toast.error(`Error: ${e.message}`),
   });
 
   return (
-    <Card className="border-2 border-primary/10 shadow-lg">
+    <Card className="border-2 border-primary/10 shadow-md">
       <CardHeader>
         <CardTitle className="flex gap-2 items-center text-xl">
           <Printer className="text-primary" size={24}/> 
-          Print Premium Stickers
+          Generate Print-Ready Stickers
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="sticker-count">How many stickers to print?</Label>
+          <Label htmlFor="sticker-count">How many stickers do you need to print?</Label>
           <Select value={count} onValueChange={setCount}>
             <SelectTrigger id="sticker-count">
-              <SelectValue placeholder="Select count" />
+              <SelectValue placeholder="Select quantity" />
             </SelectTrigger>
             <SelectContent>
               {PRINT_OPTIONS.map((o) => (
@@ -210,7 +296,7 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
           className="w-full py-6 text-lg font-bold"
         >
           {mutation.isPending ? (
-            "Generating Files..."
+            "Creating Print Layout..."
           ) : (
             <>
               <Printer size={20} className="mr-2"/>
@@ -219,7 +305,7 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
           )}
         </Button>
 
-        <div className="flex justify-between items-center px-2 py-1 bg-muted rounded-md">
+        <div className="flex justify-between items-center px-2 py-1 bg-muted rounded-md mt-2">
           <span className="text-sm font-medium">Ready in Database:</span>
           <span className="text-sm font-bold text-primary">{printableCount}</span>
         </div>
