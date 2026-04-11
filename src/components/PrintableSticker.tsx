@@ -93,7 +93,7 @@ const PrintableSticker = ({
     padding: 0.25cm 0;
   }
   .brand-logo {
-    height: 42px;
+    height: 80px;
     width: auto;
   }
   .brand-name {
