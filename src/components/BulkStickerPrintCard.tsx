@@ -99,11 +99,14 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     justify-content: center;
     padding: 0;
     margin: 0 0 -25px;
+    line-height: 0;
+    font-size: 0;
   }
   .brand-logo { 
     height: 150px; 
     width: auto;
     display: block;
+    margin-bottom: -8px;
   }
   .qr-container {
     background: white;
