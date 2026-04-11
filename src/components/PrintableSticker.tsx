@@ -138,7 +138,6 @@ const PrintableSticker = ({
   <div class="header">Scan in Emergency</div>
   <div class="brand-section">
     <img src="${window.location.origin}/logo.png" class="brand-logo" alt="logo" />
-    <div class="brand-name">Call My<br/>Family</div>
   </div>
   <div class="qr-container">${qrMarkup}</div>
   <div class="code-label">${code}</div>
