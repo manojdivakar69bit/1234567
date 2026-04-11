@@ -86,7 +86,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     color: white;
     width: 100%;
     text-align: center;
-    padding: 0.2cm 0.2cm;
+    padding: 0;
     font-family: Arial, sans-serif;
     font-weight: 900;
     font-size: 11pt;
