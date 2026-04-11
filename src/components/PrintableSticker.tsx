@@ -17,7 +17,6 @@ interface PrintableStickerProps {
 const PrintableSticker = ({
   code,
   baseUrl,
-  orgName = "Call My Family",
   stickerWidth = 6,
   stickerHeight = 8,
   logoUrl,
@@ -37,8 +36,8 @@ const PrintableSticker = ({
           src: `${window.location.origin}/logo.png`,
           x: undefined,
           y: undefined,
-          height: 36,
-          width: 36,
+          height: 75,
+          width: 80,
           excavate: true,
         }}
       />
