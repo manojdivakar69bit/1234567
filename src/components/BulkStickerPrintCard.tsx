@@ -98,7 +98,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     align-items: center;
     justify-content: center;
     padding: 0;
-    margin: 0 0 -35px;
+    margin: -35;
     line-height: 0;
     font-size: 0;
   }
