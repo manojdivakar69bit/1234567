@@ -98,7 +98,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     align-items: center;
     justify-content: center;
     padding: 0;
-    margin: 0;
+    margin: 0 0 -15px;
   }
   .brand-logo { 
     height: 95px; 
