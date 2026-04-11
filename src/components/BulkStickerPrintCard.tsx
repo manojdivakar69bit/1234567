@@ -17,7 +17,6 @@ interface Props {
   printableCount: number;
 }
 
-// Image fetch function
 const imageToBase64ViaFetch = async (url: string): Promise<string> => {
   try {
     const res = await fetch(url);
@@ -87,10 +86,10 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     color: white;
     width: 100%;
     text-align: center;
-    padding: 0.3cm 0.2cm;
+    padding: 0.2cm 0.2cm;
     font-family: Arial, sans-serif;
     font-weight: 900;
-    font-size: 12pt;
+    font-size: 11pt;
     letter-spacing: 2px;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
   }
@@ -98,16 +97,13 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 0.01cm 0;
+    padding: 0;
+    margin: 0;
   }
-  .brand-logo { height: 150px; width: auto; }
-  .brand-name {
-    font-family: Arial, sans-serif;
-    font-size: 16pt;
-    font-weight: 900;
-    color: #1a365d;
-    line-height: 1.1;
+  .brand-logo { 
+    height: 95px; 
+    width: auto;
+    display: block;
   }
   .qr-container {
     background: white;
@@ -115,23 +111,23 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     border-radius: 10px;
     padding: 6px;
     box-shadow: 0 0 12px rgba(66,133,244,0.15);
-    margin: 0 0 0.05cm 0;
+    margin: 0;
   }
-  .qr-container svg { width: 3.2cm !important; height: 3.2cm !important; display: block; }
+  .qr-container svg { width: 3.3cm !important; height: 3.3cm !important; display: block; }
   .code-label {
     font-family: 'Arial Black', Arial, sans-serif;
-    font-size: 14pt;
+    font-size: 13pt;
     font-weight: 900;
     color: #1a365d;
     letter-spacing: 1px;
-    margin: 0.1cm 0;
+    margin: 0.08cm 0;
   }
   .footer {
     background: linear-gradient(135deg, #dc2626, #b91c1c);
     color: white;
     width: 100%;
     text-align: center;
-    padding: 0.18cm;
+    padding: 0.15cm;
     font-family: Arial, sans-serif;
     font-size: 8pt;
     font-weight: 600;
