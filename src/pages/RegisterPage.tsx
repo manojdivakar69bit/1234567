@@ -7,11 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CheckCircle2, Printer, User, Car, Droplets, Phone, Plus, Trash2 } from "lucide-react";
-import { useRazorpayCheckout } from "@/hooks/useRazorpayCheckout";
+import { CheckCircle2, Printer, User, Car, Droplets, Phone, Plus, Trash2, Copy, Smartphone } from "lucide-react";
 import QRCode from "qrcode";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+const UPI_ID = "manojdivakar69-3@oksbi";
+const UPI_NAME = "Manoj%20Divakar";
 
 interface Contact {
   name: string;
@@ -19,14 +21,18 @@ interface Contact {
   relationship: string;
 }
 
+const generateOrderRef = () => `ORD${Date.now()}`;
+
 const RegisterPage = () => {
-  const [step, setStep] = useState<"form" | "success">("form");
+  const [step, setStep] = useState<"form" | "payment" | "success">("form");
   const [form, setForm] = useState({ name: "", vehicle_number: "", blood_group: "", address: "" });
   const [contacts, setContacts] = useState<Contact[]>([{ name: "", phone: "", relationship: "" }]);
   const [activatedCode, setActivatedCode] = useState<string | null>(null);
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
-
-  const { initiatePayment } = useRazorpayCheckout();
+  const [upiQrUrl, setUpiQrUrl] = useState<string | null>(null);
+  const [orderRef] = useState(generateOrderRef);
+  const [utr, setUtr] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
 
   // Fetch dynamic price
   const { data: qrPrice = 70 } = useQuery({
@@ -51,11 +57,47 @@ const RegisterPage = () => {
     setContacts(updated);
   };
 
+  // Generate UPI QR when moving to payment step
+  const generateUpiQr = async (amount: number, ref: string) => {
+    const upiString = `upi://pay?pa=${UPI_ID}&pn=${UPI_NAME}&am=${amount}&cu=INR&tn=EmergencyQR-${ref}&tr=${ref}`;
+    const qrDataUrl = await QRCode.toDataURL(upiString, {
+      width: 280,
+      margin: 2,
+      color: { dark: "#000000", light: "#ffffff" },
+    });
+    setUpiQrUrl(qrDataUrl);
+  };
+
+  const handleGoToPayment = async () => {
+    if (!form.name || !form.vehicle_number || !form.blood_group) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+    const validContacts = contacts.filter((c) => c.name && c.phone);
+    if (!validContacts.length) {
+      toast.error("At least one emergency contact is required");
+      return;
+    }
+    await generateUpiQr(qrPrice, orderRef);
+    setStep("payment");
+  };
+
+  const handleUpiDeepLink = () => {
+    const upiString = `upi://pay?pa=${UPI_ID}&pn=${UPI_NAME}&am=${qrPrice}&cu=INR&tn=EmergencyQR-${orderRef}&tr=${orderRef}`;
+    window.location.href = upiString;
+  };
+
+  const handleCopyUpiId = () => {
+    navigator.clipboard.writeText(UPI_ID);
+    toast.success("UPI ID Copied!");
+  };
+
   const registerMutation = useMutation({
     mutationFn: async () => {
-      if (!form.name || !form.vehicle_number || !form.blood_group) throw new Error("Please fill all required fields");
+      if (!utr || utr.length < 12) throw new Error("Please enter a valid UTR / Transaction ID (min 12 characters)");
+      if (!customerPhone || customerPhone.length !== 10) throw new Error("Please enter a valid 10-digit phone number");
+
       const validContacts = contacts.filter((c) => c.name && c.phone);
-      if (!validContacts.length) throw new Error("At least one emergency contact is required");
 
       const { data: qr, error: qrError } = await supabase
         .from("qr_codes")
@@ -84,11 +126,27 @@ const RegisterPage = () => {
       const { error: contactError } = await supabase.from("emergency_contacts").insert(contactRows);
       if (contactError) throw contactError;
 
-      const { error: statusError } = await supabase.from("qr_codes").update({ status: "activated" }).eq("id", qr.id);
+      const { error: statusError } = await supabase
+        .from("qr_codes")
+        .update({ status: "activated" })
+        .eq("id", qr.id);
       if (statusError) throw statusError;
 
+      // Save payment record
+      await supabase.from("payments").insert({
+        amount: qrPrice,
+        payment_method: "upi",
+        status: "utr_submitted",
+        customer_name: form.name,
+        notes: `Phone: ${customerPhone} | UTR: ${utr} | Ref: ${orderRef}`,
+      });
+
       const qrUrl = `${window.location.origin}/emergency/${qr.code}`;
-      const qrImage = await QRCode.toDataURL(qrUrl, { width: 400, margin: 2, color: { dark: "#000000", light: "#ffffff" } });
+      const qrImage = await QRCode.toDataURL(qrUrl, {
+        width: 400,
+        margin: 2,
+        color: { dark: "#000000", light: "#ffffff" },
+      });
       return { code: qr.code, qrImage };
     },
     onSuccess: ({ code, qrImage }) => {
@@ -99,19 +157,6 @@ const RegisterPage = () => {
     },
     onError: (err: Error) => toast.error(err.message),
   });
-
-  const handlePayment = () => {
-    if (!form.name || !form.vehicle_number || !form.blood_group) { toast.error("Please fill all required fields first"); return; }
-    const validContacts = contacts.filter((c) => c.name && c.phone);
-    if (!validContacts.length) { toast.error("At least one emergency contact is required"); return; }
-
-    initiatePayment({
-      amount: qrPrice,
-      customerName: form.name,
-      onSuccess: async () => { await registerMutation.mutateAsync(); },
-      onError: (err) => toast.error(err),
-    });
-  };
 
   const handlePrint = () => {
     if (!qrImageUrl || !activatedCode) return;
@@ -150,7 +195,7 @@ const RegisterPage = () => {
     printWindow.document.close();
   };
 
-  // SUCCESS SCREEN
+  // ─── SUCCESS SCREEN ───────────────────────────────────────────
   if (step === "success" && activatedCode && qrImageUrl) {
     return (
       <div className="min-h-screen bg-background p-4 max-w-md mx-auto space-y-4">
@@ -160,8 +205,14 @@ const RegisterPage = () => {
         <Card className="card-shadow border-green-200">
           <CardContent className="p-6 text-center space-y-4">
             <CheckCircle2 className="mx-auto text-green-500" size={64} />
-            <h2 className="text-2xl font-bold text-green-700">Payment Successful!</h2>
-            <p className="text-muted-foreground">Your Emergency QR Code is now active.</p>
+            <h2 className="text-2xl font-bold text-green-700">Order Placed!</h2>
+            <p className="text-muted-foreground text-sm">
+              Your UTR has been submitted. Our team will verify your payment within 15–30 minutes and activate your QR code.
+            </p>
+            <div className="bg-muted rounded-xl p-4 space-y-1">
+              <p className="text-sm text-muted-foreground">Order ID</p>
+              <p className="text-xl font-bold text-primary">{orderRef}</p>
+            </div>
             <div className="bg-muted rounded-xl p-4 space-y-1">
               <p className="text-sm text-muted-foreground">QR Code ID</p>
               <p className="text-xl font-bold text-primary">{activatedCode}</p>
@@ -186,6 +237,8 @@ const RegisterPage = () => {
               setContacts([{ name: "", phone: "", relationship: "" }]);
               setActivatedCode(null);
               setQrImageUrl(null);
+              setUtr("");
+              setCustomerPhone("");
             }}>
               Register Another
             </Button>
@@ -195,7 +248,114 @@ const RegisterPage = () => {
     );
   }
 
-  // FORM SCREEN
+  // ─── PAYMENT SCREEN ───────────────────────────────────────────
+  if (step === "payment") {
+    return (
+      <div className="min-h-screen bg-background p-4 max-w-md mx-auto space-y-4">
+        <div className="text-center py-4">
+          <img src="/logo.png" alt="Call My Family" className="w-32 h-32 object-contain mx-auto mb-2" />
+          <h1 className="text-xl font-bold text-primary">Complete Payment</h1>
+        </div>
+
+        {/* Amount Banner */}
+        <Card className="border-primary bg-primary/5">
+          <CardContent className="p-4 text-center">
+            <p className="text-sm text-muted-foreground">Pay this amount</p>
+            <p className="text-4xl font-black text-primary">₹{qrPrice}</p>
+            <p className="text-xs text-muted-foreground mt-1">Order ID: {orderRef}</p>
+          </CardContent>
+        </Card>
+
+        {/* UPI QR Code */}
+        <Card className="card-shadow">
+          <CardHeader>
+            <CardTitle className="text-base text-center">Scan & Pay with any UPI App</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center space-y-3">
+            {upiQrUrl && (
+              <img
+                src={upiQrUrl}
+                alt="UPI QR Code"
+                className="w-56 h-56 rounded-xl border-4 border-primary shadow-md"
+              />
+            )}
+            <p className="text-xs text-muted-foreground">PhonePe • GPay • Paytm • BHIM • Any UPI</p>
+
+            {/* UPI ID Copy */}
+            <div className="w-full flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
+              <span className="text-sm font-mono flex-1">{UPI_ID}</span>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={handleCopyUpiId}>
+                <Copy size={14} />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* OR Divider */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-muted-foreground font-medium">OR</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
+        {/* Deep Link Button */}
+        <Button
+          onClick={handleUpiDeepLink}
+          className="w-full py-6 text-lg bg-blue-600 hover:bg-blue-700 text-white"
+        >
+          <Smartphone size={20} className="mr-2" /> Pay with UPI App
+        </Button>
+
+        {/* UTR Confirmation Form */}
+        <Card className="card-shadow border-orange-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              ✅ Payment kar diya? UTR daalo
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              GPay / PhonePe → Transaction History → Transaction ID copy karo
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label>Your Phone Number *</Label>
+              <Input
+                placeholder="10-digit mobile number"
+                type="tel"
+                maxLength={10}
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, ""))}
+              />
+            </div>
+            <div>
+              <Label>UTR / Transaction ID *</Label>
+              <Input
+                placeholder="e.g. 421836519204 (min 12 characters)"
+                value={utr}
+                onChange={(e) => setUtr(e.target.value.trim())}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Minimum 12 characters • Found in your UPI app's payment history
+              </p>
+            </div>
+            <Button
+              onClick={() => registerMutation.mutate()}
+              disabled={registerMutation.isPending || !utr || !customerPhone}
+              className="w-full py-5 bg-green-600 hover:bg-green-700 text-white text-base"
+            >
+              {registerMutation.isPending ? "Submitting..." : "Confirm Order"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => setStep("form")}>
+          ← Go Back & Edit Details
+        </Button>
+      </div>
+    );
+  }
+
+  // ─── FORM SCREEN ─────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background p-4 max-w-md mx-auto space-y-4">
       <div className="text-center py-4">
@@ -264,15 +424,14 @@ const RegisterPage = () => {
 
       {/* Pay Button */}
       <Button
-        onClick={handlePayment}
-        disabled={registerMutation.isPending}
+        onClick={handleGoToPayment}
         className="w-full emergency-gradient hover:opacity-90 text-primary-foreground text-lg py-6"
       >
-        {registerMutation.isPending ? "Activating..." : `Pay ₹${qrPrice} & Get QR Code`}
+        Proceed to Pay ₹{qrPrice}
       </Button>
 
       <p className="text-center text-xs text-muted-foreground pb-4">
-        Secured by Razorpay • UPI, Cards, Net Banking accepted
+        Pay via PhonePe • GPay • Paytm • Any UPI App
       </p>
     </div>
   );
