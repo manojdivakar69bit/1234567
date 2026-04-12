@@ -5,18 +5,16 @@ import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
-const PRINT_OPTIONS = ["10", "20", "50", "100", "500", "1000"] as const;
-
-// ✅ Optimized Positions: Top value kam karne se QR upar jayega
 const STICKER_SIZES = {
   small: { 
     w: "5cm", h: "7cm", 
     qrWidth: "4.7cm",
     qrHeight: "3.7cm",
-    top: "50%",       // Pehle 90% tha (Bahut niche), ab upar hai
+    top: "50%",
     labelBottom: "0.8cm"
   },
   medium: { 
@@ -24,7 +22,7 @@ const STICKER_SIZES = {
     qrWidth: "4cm",
     qrHeight: "3.7cm",
     qrInternalSize: 110, 
-    top: "65%",       // Pehle 43% tha
+    top: "65%",
     labelBottom: "1.0cm"
   },
   large: { 
@@ -32,7 +30,7 @@ const STICKER_SIZES = {
     qrWidth: "4.7cm",
     qrHeight: "3.7cm",
     qrInternalSize: 140, 
-    top: "40%",       // Pehle 45% tha
+    top: "40%",
     labelBottom: "1.2cm"
   }
 };
@@ -55,6 +53,31 @@ const imageToBase64ViaFetch = async (url: string): Promise<string> => {
   } catch (e) {
     return "";
   }
+};
+
+const fetchCodesInRange = async (fromSerial: number, toSerial: number): Promise<string[]> => {
+  const BATCH_SIZE = 1000;
+  let allCodes: string[] = [];
+  let start = fromSerial - 1;
+  const end = toSerial - 1;
+
+  while (start <= end) {
+    const batchEnd = Math.min(start + BATCH_SIZE - 1, end);
+    const { data, error } = await supabase
+      .from("qr_codes")
+      .select("code")
+      .eq("status", "available")
+      .order("code", { ascending: true })
+      .range(start, batchEnd);
+
+    if (error) throw error;
+    if (!data?.length) break;
+
+    allCodes = allCodes.concat(data.map((d: any) => d.code));
+    start += BATCH_SIZE;
+  }
+
+  return allCodes;
 };
 
 const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: string, sizeKey: keyof typeof STICKER_SIZES) => {
@@ -171,23 +194,27 @@ ${stickers}
 };
 
 export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props) {
-  const [count, setCount] = useState("10");
-  const [selectedSize, setSelectedSize] = useState<keyof typeof STICKER_SIZES>("medium"); 
+  const [fromSerial, setFromSerial] = useState("1");
+  const [toSerial, setToSerial] = useState("50");
+  const [selectedSize, setSelectedSize] = useState<keyof typeof STICKER_SIZES>("medium");
+
+  const totalRequested = Math.max(0, Number(toSerial) - Number(fromSerial) + 1);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const bgBase64 = await imageToBase64ViaFetch(`${baseUrl}/sticker-bg.png`);
-      
-      const { data, error } = await supabase
-        .from("qr_codes")
-        .select("code")
-        .eq("status", "available")
-        .limit(Number(count));
+      const from = Number(fromSerial);
+      const to = Number(toSerial);
 
-      if (error) throw error;
-      if (!data?.length) throw new Error("No available QR codes found!");
-      
-      return { codes: data.map((d: any) => d.code), bgBase64 };
+      if (isNaN(from) || isNaN(to) || from < 1 || to < from) {
+        throw new Error("Invalid range: 'From' must be less than or equal to 'To'.");
+      }
+
+      const bgBase64 = await imageToBase64ViaFetch(`${baseUrl}/sticker-bg.png`);
+      const codes = await fetchCodesInRange(from, to);
+
+      if (!codes.length) throw new Error("No available QR codes found in this range!");
+
+      return { codes, bgBase64 };
     },
     onSuccess: ({ codes, bgBase64 }) => {
       openStickerPrintWindow(codes, bgBase64, baseUrl, selectedSize);
@@ -201,18 +228,37 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
         <CardTitle className="text-sm font-bold text-slate-700">Print Bulk Stickers</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-slate-500 uppercase">Quantity</label>
-          <Select value={count} onValueChange={setCount}>
-            <SelectTrigger className="h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PRINT_OPTIONS.map((o) => (
-                <SelectItem key={o} value={o}>{o} Stickers</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <label className="text-[10px] font-bold text-slate-500 uppercase">Serial Range</label>
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <label className="text-[9px] text-slate-400 mb-0.5 block">From #</label>
+              <Input
+                type="number"
+                min="1"
+                value={fromSerial}
+                onChange={(e) => setFromSerial(e.target.value)}
+                className="h-9 text-sm"
+                placeholder="1"
+              />
+            </div>
+            <span className="text-slate-400 mt-5">—</span>
+            <div className="flex-1">
+              <label className="text-[9px] text-slate-400 mb-0.5 block">To #</label>
+              <Input
+                type="number"
+                min="1"
+                value={toSerial}
+                onChange={(e) => setToSerial(e.target.value)}
+                className="h-9 text-sm"
+                placeholder="50"
+              />
+            </div>
+          </div>
+          {totalRequested > 0 && (
+            <p className="text-[10px] text-slate-400">{totalRequested} stickers requested</p>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -229,10 +275,10 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
           </Select>
         </div>
 
-        <Button 
-          onClick={() => mutation.mutate()} 
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold" 
-          disabled={mutation.isPending}
+        <Button
+          onClick={() => mutation.mutate()}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+          disabled={mutation.isPending || totalRequested < 1}
         >
           {mutation.isPending ? "Preparing PDF..." : "Generate & Print"}
         </Button>
