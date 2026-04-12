@@ -8,11 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ScanLine, CheckCircle2, LogOut, IndianRupee, KeyRound, Lock } from "lucide-react";
+import { ScanLine, CheckCircle2, LogOut, IndianRupee, KeyRound, Lock, QrCode } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import QrScanner from "@/components/QrScanner";
 import EmergencyContactsForm, { type EmergencyContact } from "@/components/EmergencyContactsForm";
 import { useRazorpayCheckout } from "@/hooks/useRazorpayCheckout";
+import UpiPaymentScreen from "@/components/UpiPaymentScreen";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -24,7 +25,7 @@ const SalesmanPanel = () => {
   const [form, setForm] = useState({ name: "", vehicle_number: "", blood_group: "", address: "" });
   const [contacts, setContacts] = useState<EmergencyContact[]>([{ name: "", phone: "", relationship: "" }]);
   const [success, setSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<"register" | "payment" | "password">("register");
+  const [activeTab, setActiveTab] = useState<"register" | "payment" | "password" | "upi">("register");
   const [pwdForm, setPwdForm] = useState({ newPwd: "", confirm: "" });
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -224,10 +225,33 @@ const SalesmanPanel = () => {
         <Button variant={activeTab === "payment" ? "default" : "outline"} onClick={() => setActiveTab("payment")} className={activeTab === "payment" ? "emergency-gradient text-primary-foreground" : ""}>
           <IndianRupee size={16} className="mr-1" /> Payment
         </Button>
+        <Button variant={activeTab === "upi" ? "default" : "outline"} onClick={() => setActiveTab("upi")} className={activeTab === "upi" ? "emergency-gradient text-primary-foreground" : ""}>
+          <QrCode size={16} className="mr-1" /> UPI
+        </Button>
         <Button variant={activeTab === "password" ? "default" : "outline"} onClick={() => setActiveTab("password")} className={activeTab === "password" ? "emergency-gradient text-primary-foreground" : ""}>
           <KeyRound size={16} className="mr-1" /> Password
         </Button>
       </div>
+
+      {/* UPI Tab */}
+      {activeTab === "upi" && (
+        <UpiPaymentScreen
+          onPaymentSubmit={async (data) => {
+            const { error } = await supabase.from("payments").insert({
+              amount: data.amount,
+              payment_method: "upi",
+              status: "utr_submitted",
+              collected_by_role: "salesman",
+              collected_by_id: currentSalesman?.id,
+              collector_name: currentSalesman?.name,
+              customer_name: data.customerName,
+              notes: `Phone: ${data.customerPhone} | UTR: ${data.utr} | Ref: ${data.orderRef}`,
+            });
+            if (error) throw error;
+            queryClient.invalidateQueries({ queryKey: ["salesman_payments"] });
+          }}
+        />
+      )}
 
       {/* Payment Tab */}
       {activeTab === "payment" && (
