@@ -1,4 +1,4 @@
-import { useState } from "react";
+toimport { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QRCodeSVG } from "qrcode.react";
@@ -22,7 +22,7 @@ const STICKER_SIZES = {
     w: "6.5cm", h: "9cm", 
     qrParentSize: "3.7cm", 
     qrInternalSize: 110, 
-    top: "69%" 
+    top: "65%" 
   },
   large: { 
     w: "8cm", h: "11cm", 
