@@ -16,21 +16,21 @@ const STICKER_SIZES = {
     w: "5cm", h: "7cm", 
     qrParentSize: "2.8cm", 
     qrInternalSize: 90, 
-    top: "45%",       // Pehle 90% tha (Bahut niche), ab upar hai
+    top: "55%",       // Pehle 90% tha (Bahut niche), ab upar hai
     labelBottom: "0.8cm"
   },
   medium: { 
     w: "6.5cm", h: "9cm", 
     qrParentSize: "3.7cm", 
     qrInternalSize: 110, 
-    top: "40%",       // Pehle 43% tha
+    top: "60%",       // Pehle 43% tha
     labelBottom: "1.0cm"
   },
   large: { 
     w: "8cm", h: "11cm", 
     qrParentSize: "6.5cm", 
     qrInternalSize: 140, 
-    top: "42%",       // Pehle 45% tha
+    top: "70%",       // Pehle 45% tha
     labelBottom: "1.2cm"
   }
 };
