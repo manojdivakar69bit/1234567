@@ -12,7 +12,6 @@ import { ScanLine, CheckCircle2, LogOut, IndianRupee, KeyRound, Lock, QrCode } f
 import { Link, useNavigate } from "react-router-dom";
 import QrScanner from "@/components/QrScanner";
 import EmergencyContactsForm, { type EmergencyContact } from "@/components/EmergencyContactsForm";
-import { useRazorpayCheckout } from "@/hooks/useRazorpayCheckout";
 import UpiPaymentScreen from "@/components/UpiPaymentScreen";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -20,6 +19,7 @@ const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const SalesmanPanel = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
   const [qrCodeInput, setQrCodeInput] = useState("");
   const [selectedQr, setSelectedQr] = useState<{ id: string; code: string } | null>(null);
   const [form, setForm] = useState({ name: "", vehicle_number: "", blood_group: "", address: "" });
@@ -28,34 +28,24 @@ const SalesmanPanel = () => {
   const [activeTab, setActiveTab] = useState<"register" | "payment" | "password" | "upi">("register");
   const [pwdForm, setPwdForm] = useState({ newPwd: "", confirm: "" });
   const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentCustomerName, setPaymentCustomerName] = useState("");
 
+  // Current salesman data
   const { data: currentSalesman } = useQuery({
     queryKey: ["current_salesman"],
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return null;
-      const { data } = await supabase.from("salesmen").select("*").eq("user_id", session.user.id).maybeSingle();
-      return data;
-    },
-  });
-
-  // ✅ Salesman ke agent ka data fetch karo (uska commission bhi chahiye)
-  const { data: salesmanAgent } = useQuery({
-    queryKey: ["salesman_agent", currentSalesman?.created_by_agent_id],
-    queryFn: async () => {
-      if (!currentSalesman?.created_by_agent_id) return null;
       const { data } = await supabase
-        .from("agents")
-        .select("razorpay_account_id")
-        .eq("id", currentSalesman.created_by_agent_id)
+        .from("salesmen")
+        .select("*")
+        .eq("user_id", session.user.id)
         .maybeSingle();
       return data;
     },
-    enabled: !!currentSalesman?.created_by_agent_id,
   });
 
+  // Payment history
   const { data: payments = [] } = useQuery({
     queryKey: ["salesman_payments", currentSalesman?.id],
     queryFn: async () => {
@@ -71,6 +61,7 @@ const SalesmanPanel = () => {
     enabled: !!currentSalesman?.id,
   });
 
+  // QR lookup
   const lookupQr = useMutation({
     mutationFn: async (code: string) => {
       const { data, error } = await supabase
@@ -90,6 +81,7 @@ const SalesmanPanel = () => {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  // Register customer
   const registerMutation = useMutation({
     mutationFn: async () => {
       if (!selectedQr) throw new Error("No QR selected");
@@ -111,10 +103,15 @@ const SalesmanPanel = () => {
         phone: c.phone,
         relationship: c.relationship || null,
       }));
-      const { error: contactError } = await supabase.from("emergency_contacts").insert(contactRows);
+      const { error: contactError } = await supabase
+        .from("emergency_contacts")
+        .insert(contactRows);
       if (contactError) throw contactError;
 
-      const { error: statusError } = await supabase.from("qr_codes").update({ status: "activated" }).eq("id", selectedQr.id);
+      const { error: statusError } = await supabase
+        .from("qr_codes")
+        .update({ status: "activated" })
+        .eq("id", selectedQr.id);
       if (statusError) throw statusError;
     },
     onSuccess: () => {
@@ -124,48 +121,31 @@ const SalesmanPanel = () => {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const { initiatePayment } = useRazorpayCheckout();
-
-  const savePayment = async (razorpayPaymentId?: string, razorpayOrderId?: string) => {
-    const { error } = await supabase.from("payments").insert({
-      amount: parseFloat(paymentAmount),
-      payment_method: paymentMethod,
-      status: "completed",
-      collected_by_role: "salesman",
-      collected_by_id: currentSalesman?.id,
-      customer_name: paymentCustomerName,
-      razorpay_payment_id: razorpayPaymentId || null,
-      razorpay_order_id: razorpayOrderId || null,
-    });
-    if (error) throw error;
-    queryClient.invalidateQueries({ queryKey: ["salesman_payments"] });
-    setPaymentAmount("");
-    setPaymentCustomerName("");
-    setPaymentMethod("cash");
-    toast.success("Payment collected!");
-  };
-
-  const collectPaymentMutation = useMutation({
+  // Cash payment collect
+  const collectCashMutation = useMutation({
     mutationFn: async () => {
-      if (!paymentAmount || !paymentCustomerName) throw new Error("Amount and customer name required");
-      if (paymentMethod === "razorpay") {
-        // ✅ Salesman + Agent dono ka account pass karo
-        initiatePayment({
-          amount: parseFloat(paymentAmount),
-          customerName: paymentCustomerName,
-          salesmanAccountId: currentSalesman?.razorpay_account_id || undefined, // ₹15
-          agentAccountId: salesmanAgent?.razorpay_account_id || undefined,       // ₹5
-          onSuccess: async (paymentId, orderId) => {
-            await savePayment(paymentId, orderId);
-          },
-        });
-        return;
-      }
-      await savePayment();
+      if (!paymentAmount || !paymentCustomerName)
+        throw new Error("Amount and customer name required");
+
+      const { error } = await supabase.from("payments").insert({
+        amount: parseFloat(paymentAmount),
+        payment_method: "cash",
+        status: "completed",
+        collected_by_role: "salesman",
+        collected_by_id: currentSalesman?.id,
+        collector_name: currentSalesman?.name,
+        customer_name: paymentCustomerName,
+      });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["salesman_payments"] });
+      setPaymentAmount("");
+      setPaymentCustomerName("");
+      toast.success("Cash payment recorded!");
     },
     onError: (err: Error) => toast.error(err.message),
   });
 
+  // Change password
   const changePasswordMutation = useMutation({
     mutationFn: async () => {
       if (pwdForm.newPwd !== pwdForm.confirm) throw new Error("Passwords do not match");
@@ -187,6 +167,7 @@ const SalesmanPanel = () => {
     navigate("/login");
   };
 
+  // ─── SUCCESS SCREEN ──────────────────────────────────────────
   if (success && selectedQr) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -194,8 +175,19 @@ const SalesmanPanel = () => {
           <CardContent className="p-6 space-y-4">
             <CheckCircle2 className="mx-auto text-green-500" size={64} />
             <h2 className="text-xl font-bold">Registration Complete!</h2>
-            <p className="text-muted-foreground">QR code {selectedQr.code} has been activated.</p>
-            <Button onClick={() => { setSuccess(false); setSelectedQr(null); setForm({ name: "", vehicle_number: "", blood_group: "", address: "" }); setContacts([{ name: "", phone: "", relationship: "" }]); setQrCodeInput(""); }} className="emergency-gradient hover:opacity-90 text-primary-foreground">
+            <p className="text-muted-foreground">
+              QR code {selectedQr.code} has been activated.
+            </p>
+            <Button
+              onClick={() => {
+                setSuccess(false);
+                setSelectedQr(null);
+                setForm({ name: "", vehicle_number: "", blood_group: "", address: "" });
+                setContacts([{ name: "", phone: "", relationship: "" }]);
+                setQrCodeInput("");
+              }}
+              className="emergency-gradient hover:opacity-90 text-primary-foreground"
+            >
               Register Another
             </Button>
           </CardContent>
@@ -204,36 +196,48 @@ const SalesmanPanel = () => {
     );
   }
 
+  // ─── MAIN PANEL ──────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background p-4 max-w-lg mx-auto space-y-6">
+
       <div className="w-full">
         <img src="/logo.png" alt="Call My Family" className="w-full object-contain" />
       </div>
 
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Salesman Panel</h1>
-          {currentSalesman && <p className="text-sm text-muted-foreground">{currentSalesman.name}</p>}
+          {currentSalesman && (
+            <p className="text-sm text-muted-foreground">{currentSalesman.name}</p>
+          )}
         </div>
-        <Button variant="ghost" onClick={handleLogout}><LogOut size={18} className="mr-1" /> Logout</Button>
-      </div>
-
-      <div className="flex gap-2">
-        <Button variant={activeTab === "register" ? "default" : "outline"} onClick={() => setActiveTab("register")} className={activeTab === "register" ? "emergency-gradient text-primary-foreground" : ""}>
-          <ScanLine size={16} className="mr-1" /> Register
-        </Button>
-        <Button variant={activeTab === "payment" ? "default" : "outline"} onClick={() => setActiveTab("payment")} className={activeTab === "payment" ? "emergency-gradient text-primary-foreground" : ""}>
-          <IndianRupee size={16} className="mr-1" /> Payment
-        </Button>
-        <Button variant={activeTab === "upi" ? "default" : "outline"} onClick={() => setActiveTab("upi")} className={activeTab === "upi" ? "emergency-gradient text-primary-foreground" : ""}>
-          <QrCode size={16} className="mr-1" /> UPI
-        </Button>
-        <Button variant={activeTab === "password" ? "default" : "outline"} onClick={() => setActiveTab("password")} className={activeTab === "password" ? "emergency-gradient text-primary-foreground" : ""}>
-          <KeyRound size={16} className="mr-1" /> Password
+        <Button variant="ghost" onClick={handleLogout}>
+          <LogOut size={18} className="mr-1" /> Logout
         </Button>
       </div>
 
-      {/* UPI Tab */}
+      {/* Tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {[
+          { key: "register", label: "Register", icon: <ScanLine size={16} /> },
+          { key: "payment",  label: "Cash",     icon: <IndianRupee size={16} /> },
+          { key: "upi",      label: "UPI",      icon: <QrCode size={16} /> },
+          { key: "password", label: "Password", icon: <KeyRound size={16} /> },
+        ].map((tab) => (
+          <Button
+            key={tab.key}
+            variant={activeTab === tab.key ? "default" : "outline"}
+            onClick={() => setActiveTab(tab.key as typeof activeTab)}
+            className={activeTab === tab.key ? "emergency-gradient text-primary-foreground" : ""}
+          >
+            {tab.icon}
+            <span className="ml-1">{tab.label}</span>
+          </Button>
+        ))}
+      </div>
+
+      {/* ── UPI TAB ─────────────────────────────────────────── */}
       {activeTab === "upi" && (
         <UpiPaymentScreen
           onPaymentSubmit={async (data) => {
@@ -253,55 +257,57 @@ const SalesmanPanel = () => {
         />
       )}
 
-      {/* Payment Tab */}
+      {/* ── CASH PAYMENT TAB ────────────────────────────────── */}
       {activeTab === "payment" && (
         <>
-          {/* ✅ Commission info */}
-          <Card className="border-green-200 bg-green-50">
-            <CardContent className="p-3 text-sm text-green-700">
-              💰 Per QR sale: You earn <strong>₹15</strong> automatically in your account.
-            </CardContent>
-          </Card>
-
-          {!currentSalesman?.razorpay_account_id && (
-            <Card className="border-orange-200 bg-orange-50">
-              <CardContent className="p-3 text-sm text-orange-700">
-                ⚠️ Your Razorpay Linked Account ID is not set. Commission (₹15) will not be transferred automatically. Contact your agent to set it up.
-              </CardContent>
-            </Card>
-          )}
-
           <Card className="card-shadow">
-            <CardHeader><CardTitle className="flex items-center gap-2"><IndianRupee size={18} /> Collect Payment</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IndianRupee size={18} /> Collect Cash Payment
+              </CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
-              <div><Label>Customer Name *</Label><Input value={paymentCustomerName} onChange={(e) => setPaymentCustomerName(e.target.value)} /></div>
-              <div><Label>Amount (₹) *</Label><Input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} /></div>
               <div>
-                <Label>Payment Method</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="upi">UPI</SelectItem>
-                    <SelectItem value="razorpay">Razorpay</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Customer Name *</Label>
+                <Input
+                  value={paymentCustomerName}
+                  onChange={(e) => setPaymentCustomerName(e.target.value)}
+                  placeholder="Customer name"
+                />
               </div>
-              <Button onClick={() => collectPaymentMutation.mutate()} disabled={!paymentAmount || !paymentCustomerName || collectPaymentMutation.isPending} className="w-full emergency-gradient hover:opacity-90 text-primary-foreground">
-                {collectPaymentMutation.isPending ? "Processing..." : "Collect Payment"}
+              <div>
+                <Label>Amount (₹) *</Label>
+                <Input
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  placeholder="Enter amount"
+                />
+              </div>
+              <Button
+                onClick={() => collectCashMutation.mutate()}
+                disabled={!paymentAmount || !paymentCustomerName || collectCashMutation.isPending}
+                className="w-full emergency-gradient hover:opacity-90 text-primary-foreground"
+              >
+                {collectCashMutation.isPending ? "Saving..." : "Record Cash Payment"}
               </Button>
             </CardContent>
           </Card>
 
+          {/* Payment History */}
           {payments.length > 0 && (
             <Card className="card-shadow">
-              <CardHeader><CardTitle>Payment History ({payments.length})</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Payment History ({payments.length})</CardTitle>
+              </CardHeader>
               <CardContent className="space-y-2 max-h-60 overflow-y-auto">
                 {payments.map((p: any) => (
                   <div key={p.id} className="flex items-center justify-between p-2 border rounded">
                     <div>
                       <div className="font-medium">{p.customer_name}</div>
-                      <div className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString()}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(p.created_at).toLocaleDateString()}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="font-bold">₹{p.amount}</div>
@@ -315,18 +321,32 @@ const SalesmanPanel = () => {
         </>
       )}
 
-      {/* Password Tab */}
+      {/* ── PASSWORD TAB ────────────────────────────────────── */}
       {activeTab === "password" && (
         <Card className="card-shadow border-red-100">
-          <CardHeader><CardTitle className="flex items-center gap-2"><KeyRound size={18} className="text-red-600" /> Change Password</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <KeyRound size={18} className="text-red-600" /> Change Password
+            </CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <Label>New Password *</Label>
-              <Input type="password" placeholder="Enter new password" value={pwdForm.newPwd} onChange={e => setPwdForm({...pwdForm, newPwd: e.target.value})} />
+              <Input
+                type="password"
+                placeholder="Enter new password"
+                value={pwdForm.newPwd}
+                onChange={(e) => setPwdForm({ ...pwdForm, newPwd: e.target.value })}
+              />
             </div>
             <div>
               <Label>Confirm Password *</Label>
-              <Input type="password" placeholder="Confirm new password" value={pwdForm.confirm} onChange={e => setPwdForm({...pwdForm, confirm: e.target.value})} />
+              <Input
+                type="password"
+                placeholder="Confirm new password"
+                value={pwdForm.confirm}
+                onChange={(e) => setPwdForm({ ...pwdForm, confirm: e.target.value })}
+              />
             </div>
             <Button
               onClick={() => changePasswordMutation.mutate()}
@@ -340,36 +360,86 @@ const SalesmanPanel = () => {
         </Card>
       )}
 
-      {/* Register Tab */}
+      {/* ── REGISTER TAB ────────────────────────────────────── */}
       {activeTab === "register" && (
         <>
           {!selectedQr ? (
             <Card className="card-shadow">
-              <CardHeader><CardTitle className="flex items-center gap-2"><ScanLine size={18} /> Scan or Enter QR Code</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ScanLine size={18} /> Scan or Enter QR Code
+                </CardTitle>
+              </CardHeader>
               <CardContent className="space-y-4">
                 <QrScanner onScan={(code) => lookupQr.mutate(code)} />
                 <div className="flex gap-2">
-                  <Input placeholder="EMR-00001" value={qrCodeInput} onChange={(e) => setQrCodeInput(e.target.value)} />
-                  <Button onClick={() => lookupQr.mutate(qrCodeInput)} disabled={!qrCodeInput} className="emergency-gradient hover:opacity-90 text-primary-foreground">Lookup</Button>
+                  <Input
+                    placeholder="EMR-00001"
+                    value={qrCodeInput}
+                    onChange={(e) => setQrCodeInput(e.target.value)}
+                  />
+                  <Button
+                    onClick={() => lookupQr.mutate(qrCodeInput)}
+                    disabled={!qrCodeInput}
+                    className="emergency-gradient hover:opacity-90 text-primary-foreground"
+                  >
+                    Lookup
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           ) : (
             <Card className="card-shadow">
-              <CardHeader><CardTitle>Register Customer — {selectedQr.code}</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Register Customer — {selectedQr.code}</CardTitle>
+              </CardHeader>
               <CardContent className="space-y-4">
-                <div><Label>Full Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-                <div><Label>Vehicle Number *</Label><Input value={form.vehicle_number} onChange={(e) => setForm({ ...form, vehicle_number: e.target.value })} /></div>
+                <div>
+                  <Label>Full Name *</Label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Vehicle Number *</Label>
+                  <Input
+                    value={form.vehicle_number}
+                    onChange={(e) => setForm({ ...form, vehicle_number: e.target.value.toUpperCase() })}
+                  />
+                </div>
                 <div>
                   <Label>Blood Group *</Label>
-                  <Select value={form.blood_group} onValueChange={(v) => setForm({ ...form, blood_group: v })}>
+                  <Select
+                    value={form.blood_group}
+                    onValueChange={(v) => setForm({ ...form, blood_group: v })}
+                  >
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>{BLOOD_GROUPS.map((bg) => (<SelectItem key={bg} value={bg}>{bg}</SelectItem>))}</SelectContent>
+                    <SelectContent>
+                      {BLOOD_GROUPS.map((bg) => (
+                        <SelectItem key={bg} value={bg}>{bg}</SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </div>
-                <div><Label>Address</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+                <div>
+                  <Label>Address</Label>
+                  <Input
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  />
+                </div>
                 <EmergencyContactsForm contacts={contacts} onChange={setContacts} />
-                <Button onClick={() => registerMutation.mutate()} disabled={!form.name || !form.vehicle_number || !form.blood_group || registerMutation.isPending} className="w-full emergency-gradient hover:opacity-90 text-primary-foreground">
+                <Button
+                  onClick={() => registerMutation.mutate()}
+                  disabled={
+                    !form.name ||
+                    !form.vehicle_number ||
+                    !form.blood_group ||
+                    registerMutation.isPending
+                  }
+                  className="w-full emergency-gradient hover:opacity-90 text-primary-foreground"
+                >
                   {registerMutation.isPending ? "Registering..." : "Register & Activate"}
                 </Button>
               </CardContent>
@@ -378,7 +448,9 @@ const SalesmanPanel = () => {
         </>
       )}
 
-      <Button asChild variant="ghost" className="w-full"><Link to="/"><span>← Back</span></Link></Button>
+      <Button asChild variant="ghost" className="w-full">
+        <Link to="/"><span>← Back</span></Link>
+      </Button>
     </div>
   );
 };
