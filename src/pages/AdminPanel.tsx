@@ -27,10 +27,12 @@ const AdminPanel = () => {
   const [assignFrom, setAssignFrom] = useState("");
   const [assignTo, setAssignTo] = useState("");
   const [assignAgentId, setAssignAgentId] = useState("");
-  const [agentForm, setAgentForm] = useState({ name: "", phone: "", email: "", password: "", bank: "", acc: "", ifsc: "" });
-  const [salesmanForm, setSalesmanForm] = useState({ name: "", phone: "", email: "", password: "", bank: "", acc: "", ifsc: "" });
+
+  // ✅ UPI ID field added, bank details optional
+  const [agentForm, setAgentForm] = useState({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
+  const [salesmanForm, setSalesmanForm] = useState({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
+
   const [resetPasswords, setResetPasswords] = useState<Record<string, string>>({});
-  // ✅ Admin khud apna password change kare
   const [adminPwdForm, setAdminPwdForm] = useState({ current: "", newPwd: "", confirm: "" });
 
   // --- QUERIES ---
@@ -79,7 +81,16 @@ const AdminPanel = () => {
     }
   });
 
-  // ✅ Fix: useEffect se settings load — input delete kaam karega
+  // ✅ Print history query
+  const { data: printHistory = [] } = useQuery({
+    queryKey: ["print_history"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("print_history").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   useEffect(() => {
     if (appSettings && appSettings.length > 0) {
       const map: any = {};
@@ -114,7 +125,6 @@ const AdminPanel = () => {
     onError: () => toast.error("Failed to save settings"),
   });
 
-  // ✅ Agent/Salesman password reset
   const resetUserPasswordMutation = useMutation({
     mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
       if (!newPassword || newPassword.length < 6) throw new Error("Password must be at least 6 characters");
@@ -130,7 +140,6 @@ const AdminPanel = () => {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  // ✅ Admin apna password change kare
   const changeAdminPasswordMutation = useMutation({
     mutationFn: async () => {
       if (adminPwdForm.newPwd !== adminPwdForm.confirm) throw new Error("Passwords do not match");
@@ -145,32 +154,54 @@ const AdminPanel = () => {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  // ✅ Agent registration — onError added, upi_id added, bank optional
   const addAgentMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke("create-agent", { 
-        body: { ...agentForm, bank_name: agentForm.bank, account_number: agentForm.acc, ifsc_code: agentForm.ifsc } 
+        body: { 
+          name: agentForm.name,
+          phone: agentForm.phone,
+          email: agentForm.email,
+          password: agentForm.password,
+          upi_id: agentForm.upi_id || null,
+          bank_name: agentForm.bank || null,
+          account_number: agentForm.acc || null,
+          ifsc_code: agentForm.ifsc || null,
+        } 
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents"] });
-      setAgentForm({ name: "", phone: "", email: "", password: "", bank: "", acc: "", ifsc: "" });
+      setAgentForm({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
       toast.success("Agent Registered!");
-    }
+    },
+    onError: (err: any) => toast.error(err.message || "Agent registration failed"),
   });
 
+  // ✅ Salesman registration — onError added, upi_id added, bank optional
   const addSalesmanMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke("create-salesman", { 
-        body: { ...salesmanForm, bank_name: salesmanForm.bank, account_number: salesmanForm.acc, ifsc_code: salesmanForm.ifsc } 
+        body: { 
+          name: salesmanForm.name,
+          phone: salesmanForm.phone,
+          email: salesmanForm.email,
+          password: salesmanForm.password,
+          upi_id: salesmanForm.upi_id || null,
+          bank_name: salesmanForm.bank || null,
+          account_number: salesmanForm.acc || null,
+          ifsc_code: salesmanForm.ifsc || null,
+        } 
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salesmen"] });
-      setSalesmanForm({ name: "", phone: "", email: "", password: "", bank: "", acc: "", ifsc: "" });
+      setSalesmanForm({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
       toast.success("Salesman Registered!");
-    }
+    },
+    onError: (err: any) => toast.error(err.message || "Salesman registration failed"),
   });
 
   const deleteUserMutation = useMutation({
@@ -211,6 +242,32 @@ const AdminPanel = () => {
       await supabase.from("qr_codes").update(update).in("id", ids);
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["qr_codes"] }); toast.success("Range Updated!"); }
+  });
+
+  // ✅ Print history delete single
+  const deletePrintHistoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("print_history").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["print_history"] });
+      toast.success("Record Deleted!");
+    },
+    onError: () => toast.error("Delete failed"),
+  });
+
+  // ✅ Print history clear all
+  const clearAllPrintHistoryMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("print_history").delete().neq("id", "");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["print_history"] });
+      toast.success("All History Cleared!");
+    },
+    onError: () => toast.error("Clear all failed"),
   });
 
   const handleLogout = () => { supabase.auth.signOut(); localStorage.clear(); navigate("/login"); };
@@ -356,29 +413,71 @@ const AdminPanel = () => {
 
       {/* REGISTRATION FORMS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {/* ✅ AGENT FORM — UPI ID added, bank optional, button fixed */}
         <Card className="border-blue-100 shadow-sm">
-          <CardHeader className="py-3 bg-blue-50/50 border-b"><CardTitle className="text-sm flex items-center gap-2"><UserPlus size={16}/> New Agent</CardTitle></CardHeader>
+          <CardHeader className="py-3 bg-blue-50/50 border-b">
+            <CardTitle className="text-sm flex items-center gap-2"><UserPlus size={16}/> New Agent</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3 pt-4">
-            <div className="grid grid-cols-2 gap-2"><Input placeholder="Name" value={agentForm.name} onChange={e=>setAgentForm({...agentForm, name: e.target.value})} /><Input placeholder="Email" value={agentForm.email} onChange={e=>setAgentForm({...agentForm, email: e.target.value})} /></div>
-            <div className="grid grid-cols-2 gap-2"><Input placeholder="Phone" value={agentForm.phone} onChange={e=>setAgentForm({...agentForm, phone: e.target.value})} /><Input placeholder="Password" type="password" value={agentForm.password} onChange={e=>setAgentForm({...agentForm, password: e.target.value})} /></div>
-            <div className="p-2 border rounded bg-slate-50/50 space-y-2">
-              <Input placeholder="Bank Name" value={agentForm.bank} onChange={e=>setAgentForm({...agentForm, bank: e.target.value})} />
-              <div className="grid grid-cols-2 gap-2"><Input placeholder="Account No" value={agentForm.acc} onChange={e=>setAgentForm({...agentForm, acc: e.target.value})} /><Input placeholder="IFSC" value={agentForm.ifsc} onChange={e=>setAgentForm({...agentForm, ifsc: e.target.value})} /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Name *" value={agentForm.name} onChange={e=>setAgentForm({...agentForm, name: e.target.value})} />
+              <Input placeholder="Email *" value={agentForm.email} onChange={e=>setAgentForm({...agentForm, email: e.target.value})} />
             </div>
-            <Button onClick={()=>addAgentMutation.mutate()} className="w-full">Register Agent</Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Phone *" value={agentForm.phone} onChange={e=>setAgentForm({...agentForm, phone: e.target.value})} />
+              <Input placeholder="Password *" type="password" value={agentForm.password} onChange={e=>setAgentForm({...agentForm, password: e.target.value})} />
+            </div>
+            <Input placeholder="UPI ID (e.g. name@upi)" value={agentForm.upi_id} onChange={e=>setAgentForm({...agentForm, upi_id: e.target.value})} />
+            <div className="p-2 border rounded bg-slate-50/50 space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">Bank Details (Optional)</p>
+              <Input placeholder="Bank Name" value={agentForm.bank} onChange={e=>setAgentForm({...agentForm, bank: e.target.value})} />
+              <div className="grid grid-cols-2 gap-2">
+                <Input placeholder="Account No" value={agentForm.acc} onChange={e=>setAgentForm({...agentForm, acc: e.target.value})} />
+                <Input placeholder="IFSC" value={agentForm.ifsc} onChange={e=>setAgentForm({...agentForm, ifsc: e.target.value})} />
+              </div>
+            </div>
+            <Button
+              onClick={() => addAgentMutation.mutate()}
+              disabled={addAgentMutation.isPending}
+              className="w-full"
+            >
+              {addAgentMutation.isPending ? "Registering..." : "Register Agent"}
+            </Button>
           </CardContent>
         </Card>
 
+        {/* ✅ SALESMAN FORM — UPI ID added, bank optional, button fixed */}
         <Card className="border-purple-100 shadow-sm">
-          <CardHeader className="py-3 bg-purple-50/50 border-b"><CardTitle className="text-sm flex items-center gap-2"><UserPlus size={16}/> New Salesman</CardTitle></CardHeader>
+          <CardHeader className="py-3 bg-purple-50/50 border-b">
+            <CardTitle className="text-sm flex items-center gap-2"><UserPlus size={16}/> New Salesman</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3 pt-4">
-            <div className="grid grid-cols-2 gap-2"><Input placeholder="Name" value={salesmanForm.name} onChange={e=>setSalesmanForm({...salesmanForm, name: e.target.value})} /><Input placeholder="Email" value={salesmanForm.email} onChange={e=>setSalesmanForm({...salesmanForm, email: e.target.value})} /></div>
-            <div className="grid grid-cols-2 gap-2"><Input placeholder="Phone" value={salesmanForm.phone} onChange={e=>setSalesmanForm({...salesmanForm, phone: e.target.value})} /><Input placeholder="Password" type="password" value={salesmanForm.password} onChange={e=>setSalesmanForm({...salesmanForm, password: e.target.value})} /></div>
-            <div className="p-2 border rounded bg-slate-50/50 space-y-2">
-              <Input placeholder="Bank Name" value={salesmanForm.bank} onChange={e=>setSalesmanForm({...salesmanForm, bank: e.target.value})} />
-              <div className="grid grid-cols-2 gap-2"><Input placeholder="Account No" value={salesmanForm.acc} onChange={e=>setSalesmanForm({...salesmanForm, acc: e.target.value})} /><Input placeholder="IFSC" value={salesmanForm.ifsc} onChange={e=>setSalesmanForm({...salesmanForm, ifsc: e.target.value})} /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Name *" value={salesmanForm.name} onChange={e=>setSalesmanForm({...salesmanForm, name: e.target.value})} />
+              <Input placeholder="Email *" value={salesmanForm.email} onChange={e=>setSalesmanForm({...salesmanForm, email: e.target.value})} />
             </div>
-            <Button onClick={()=>addSalesmanMutation.mutate()} variant="secondary" className="w-full">Register Salesman</Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Phone *" value={salesmanForm.phone} onChange={e=>setSalesmanForm({...salesmanForm, phone: e.target.value})} />
+              <Input placeholder="Password *" type="password" value={salesmanForm.password} onChange={e=>setSalesmanForm({...salesmanForm, password: e.target.value})} />
+            </div>
+            <Input placeholder="UPI ID (e.g. name@upi)" value={salesmanForm.upi_id} onChange={e=>setSalesmanForm({...salesmanForm, upi_id: e.target.value})} />
+            <div className="p-2 border rounded bg-slate-50/50 space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">Bank Details (Optional)</p>
+              <Input placeholder="Bank Name" value={salesmanForm.bank} onChange={e=>setSalesmanForm({...salesmanForm, bank: e.target.value})} />
+              <div className="grid grid-cols-2 gap-2">
+                <Input placeholder="Account No" value={salesmanForm.acc} onChange={e=>setSalesmanForm({...salesmanForm, acc: e.target.value})} />
+                <Input placeholder="IFSC" value={salesmanForm.ifsc} onChange={e=>setSalesmanForm({...salesmanForm, ifsc: e.target.value})} />
+              </div>
+            </div>
+            <Button
+              onClick={() => addSalesmanMutation.mutate()}
+              disabled={addSalesmanMutation.isPending}
+              variant="secondary"
+              className="w-full"
+            >
+              {addSalesmanMutation.isPending ? "Registering..." : "Register Salesman"}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -411,7 +510,7 @@ const AdminPanel = () => {
         </Card>
       </div>
 
-      {/* ✅ GENERATED QR LIST */}
+      {/* GENERATED QR LIST */}
       <Card className="border-slate-200 shadow-sm overflow-hidden">
         <CardHeader className="bg-slate-50 py-3 border-b flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold">Generated QR Codes</CardTitle>
@@ -477,7 +576,7 @@ const AdminPanel = () => {
         </CardContent>
       </Card>
 
-      {/* ✅ ADMIN PASSWORD CHANGE */}
+      {/* ADMIN PASSWORD CHANGE */}
       <Card className="border-red-100 shadow-sm">
         <CardHeader className="py-3 bg-red-50/50 border-b">
           <CardTitle className="text-sm flex items-center gap-2"><KeyRound size={16} className="text-red-600"/> Change Admin Password</CardTitle>
@@ -525,8 +624,54 @@ const AdminPanel = () => {
       {/* COMMISSION TRACKING */}
       <CommissionTracker />
 
+      {/* BULK STICKER PRINT */}
       <BulkStickerPrintCard baseUrl={window.location.origin} printableCount={qrCodes.filter((q: any) => q.status !== 'activated').length} />
-      <PrintHistoryCard />
+
+      {/* ✅ PRINT HISTORY — with delete per row + clear all */}
+      <Card className="border-slate-200 shadow-sm overflow-hidden">
+        <CardHeader className="bg-slate-50 py-3 border-b flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-bold">Print History</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-500 border-red-200 h-7 text-xs hover:bg-red-50"
+            onClick={() => { if(confirm("Delete all print history?")) clearAllPrintHistoryMutation.mutate(); }}
+            disabled={clearAllPrintHistoryMutation.isPending || printHistory.length === 0}
+          >
+            Clear All
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0 max-h-72 overflow-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 text-[10px] uppercase sticky top-0">
+              <tr><th className="p-3">Details</th><th className="p-3">Count</th><th className="p-3">Date</th><th className="p-3 text-center">Del</th></tr>
+            </thead>
+            <tbody>
+              {printHistory.map((h: any) => (
+                <tr key={h.id} className="border-b hover:bg-slate-50">
+                  <td className="p-3 text-xs">{h.details || h.range || "—"}</td>
+                  <td className="p-3 font-mono font-bold">{h.count || "—"}</td>
+                  <td className="p-3 text-[10px] text-muted-foreground">{new Date(h.created_at).toLocaleString('en-IN')}</td>
+                  <td className="p-3 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 h-7 p-0"
+                      onClick={() => { if(confirm("Delete this record?")) deletePrintHistoryMutation.mutate(h.id); }}
+                    >
+                      <Trash2 size={14}/>
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+              {printHistory.length === 0 && (
+                <tr><td colSpan={4} className="p-8 text-center text-slate-400">No print history yet</td></tr>
+              )}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
     </div>
   );
 };
