@@ -116,8 +116,8 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     background: white;
     border-radius: 8px;
     padding: 6px;
-    width: ${config.qrParentSize};
-    height: ${config.qrParentSize};
+    width: ${config.qrWidth};
+    height: ${config.qrHeight};
     display: flex;
     align-items: center;
     justify-content: center;
