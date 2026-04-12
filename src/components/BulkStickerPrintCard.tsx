@@ -135,13 +135,13 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     left: 50%;
     transform: translateX(-50%);
     font-family: 'Arial Black', Gadget, sans-serif;
-    font-size: 10pt;
-    font-weight: 900;
+    font-size: 8pt;
+    font-weight: 800;
     color: #1a365d;
     letter-spacing: 1px;
     background: rgba(255,255,255,0.8);
     padding: 2px 8px;
-    border-radius: 4px;
+    border-radius: 3px;
     white-space: nowrap;
   }
   @media print {
