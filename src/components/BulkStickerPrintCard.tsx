@@ -21,7 +21,7 @@ const STICKER_SIZES = {
   },
   medium: { 
     w: "6.5cm", h: "9cm",
-    qrWidth: "4.3cm",
+    qrWidth: "4.1cm",
     qrHeight: "3.7cm",
     qrInternalSize: 110, 
     top: "65%",       // Pehle 43% tha
