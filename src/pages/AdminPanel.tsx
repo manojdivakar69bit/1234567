@@ -15,6 +15,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import BulkStickerPrintCard from "@/components/BulkStickerPrintCard";
 import PrintHistoryCard from "@/components/PrintHistoryCard";
+import UpiPaymentScreen from "@/components/UpiPaymentScreen";
+import CommissionTracker from "@/components/CommissionTracker";
 
 const AdminPanel = () => {
   const queryClient = useQueryClient();
@@ -503,6 +505,25 @@ const AdminPanel = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* UPI PAYMENT */}
+      <UpiPaymentScreen
+        onPaymentSubmit={async (data) => {
+          const { error } = await supabase.from("payments").insert({
+            amount: data.amount,
+            payment_method: "upi",
+            status: "utr_submitted",
+            collected_by_role: "admin",
+            customer_name: data.customerName,
+            notes: `Phone: ${data.customerPhone} | UTR: ${data.utr} | Ref: ${data.orderRef}`,
+          });
+          if (error) throw error;
+          queryClient.invalidateQueries({ queryKey: ["all_payments"] });
+        }}
+      />
+
+      {/* COMMISSION TRACKING */}
+      <CommissionTracker />
 
       <BulkStickerPrintCard baseUrl={window.location.origin} printableCount={qrCodes.filter((q: any) => q.status !== 'activated').length} />
       <PrintHistoryCard />
