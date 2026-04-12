@@ -10,11 +10,26 @@ import { toast } from "sonner";
 
 const PRINT_OPTIONS = ["10", "20", "50", "100", "500", "1000"] as const;
 
-// Sticker Size Config
+// ✅ Perfect Aligned Sizes
 const STICKER_SIZES = {
-  small: { w: "5cm", h: "7cm", qrSize: "2.5cm", top: "60%" },
-  medium: { w: "6.5cm", h: "9cm", qrSize: "3.2cm", top: "65%" }, // Default
-  large: { w: "8cm", h: "11cm", qrSize: "4.5cm", top: "68%" }
+  small: { 
+    w: "5cm", h: "7cm", 
+    qrParentSize: "2.8cm", 
+    qrInternalSize: 90, 
+    top: "60%" 
+  },
+  medium: { 
+    w: "6.5cm", h: "9cm", 
+    qrParentSize: "3.5cm", 
+    qrInternalSize: 110, 
+    top: "63%" 
+  },
+  large: { 
+    w: "8cm", h: "11cm", 
+    qrParentSize: "4.5cm", 
+    qrInternalSize: 140, 
+    top: "65%" 
+  }
 };
 
 interface Props {
@@ -37,7 +52,6 @@ const imageToBase64ViaFetch = async (url: string): Promise<string> => {
   }
 };
 
-// ✅ Isme ab 'sizeKey' pass ho raha hai jo CSS badal dega
 const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: string, sizeKey: keyof typeof STICKER_SIZES) => {
   const config = STICKER_SIZES[sizeKey];
 
@@ -45,7 +59,7 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     const qr = renderToStaticMarkup(
       <QRCodeSVG
         value={`${baseUrl}/emergency/${code}`}
-        size={300}
+        size={config.qrInternalSize}
         level="H"
         includeMargin={false}
       />
@@ -87,7 +101,6 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     justify-content: flex-end;
     position: relative;
     overflow: hidden;
-    border: 0.5px solid #eee;
   }
   .qr-area {
     position: absolute;
@@ -96,9 +109,9 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     transform: translate(-50%, -50%);
     background: white;
     border-radius: 8px;
-    padding: 4px;
-    width: ${config.qrSize};
-    height: ${config.qrSize};
+    padding: 6px;
+    width: ${config.qrParentSize};
+    height: ${config.qrParentSize};
     display: flex;
     align-items: center;
     justify-content: center;
@@ -108,6 +121,8 @@ const openStickerPrintWindow = (codes: string[], bgBase64: string, baseUrl: stri
     width: 100% !important;
     height: 100% !important;
     display: block;
+    max-width: 100%;
+    max-height: 100%;
   }
   .code-label {
     position: absolute;
@@ -157,36 +172,45 @@ export default function BulkStickerPrintCard({ baseUrl, printableCount }: Props)
       return { codes: data.map((d: any) => d.code), bgBase64 };
     },
     onSuccess: ({ codes, bgBase64 }) => {
-      // ✅ Yahan selectedSize pass ho raha hai
       openStickerPrintWindow(codes, bgBase64, baseUrl, selectedSize);
     },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
-    <Card>
-      <CardHeader><CardTitle>Print Premium Stickers</CardTitle></CardHeader>
+    <Card className="border-slate-200 shadow-sm">
+      <CardHeader><CardTitle className="text-sm font-bold">Print Bulk Stickers</CardTitle></CardHeader>
       <CardContent className="space-y-4">
-        {/* Count Selector */}
-        <Select value={count} onValueChange={setCount}>
-          <SelectTrigger><SelectValue placeholder="Quantity" /></SelectTrigger>
-          <SelectContent>
-            {PRINT_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o} Stickers</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {/* Quantity Select */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-500 uppercase">Quantity</label>
+          <Select value={count} onValueChange={setCount}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {PRINT_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o} Stickers</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
 
-        {/* ✅ Size Selector */}
-        <Select value={selectedSize} onValueChange={(v: any) => setSelectedSize(v)}>
-          <SelectTrigger><SelectValue placeholder="Select Size" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="small">Small (5x7 cm)</SelectItem>
-            <SelectItem value="medium">Medium (6.5x9 cm)</SelectItem>
-            <SelectItem value="large">Large (8x11 cm)</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Size Select */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-500 uppercase">Sticker Size</label>
+          <Select value={selectedSize} onValueChange={(val: any) => setSelectedSize(val)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="small">Small (5x7 cm)</SelectItem>
+              <SelectItem value="medium">Medium (6.5x9 cm)</SelectItem>
+              <SelectItem value="large">Large (8x11 cm)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Button onClick={() => mutation.mutate()} className="w-full" disabled={mutation.isPending}>
-          {mutation.isPending ? "Preparing..." : "Print Now"}
+        <Button 
+          onClick={() => mutation.mutate()} 
+          className="w-full bg-blue-600 hover:bg-blue-700" 
+          disabled={mutation.isPending}
+        >
+          {mutation.isPending ? "Generating..." : "Print Now"}
         </Button>
       </CardContent>
     </Card>
