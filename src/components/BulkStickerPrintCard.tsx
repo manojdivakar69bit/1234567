@@ -16,7 +16,7 @@ const STICKER_SIZES = {
     w: "5cm", h: "7cm", 
     qrParentSize: "2.8cm", 
     qrInternalSize: 90, 
-    top: "70%" 
+    top: "90%" 
   },
   medium: { 
     w: "6.5cm", h: "9cm", 
@@ -28,7 +28,7 @@ const STICKER_SIZES = {
     w: "8cm", h: "11cm", 
     qrParentSize: "6.5cm", 
     qrInternalSize: 140, 
-    top: "85%" 
+    top: "45%" 
   }
 };
 
