@@ -14,8 +14,9 @@ const PRINT_OPTIONS = ["10", "20", "50", "100", "500", "1000"] as const;
 const STICKER_SIZES = {
   small: { 
     w: "5cm", h: "7cm", 
-    qrParentSize: "2.8cm", 
-    qrInternalSize: 90, 
+    qrParentSize: "2.8cm",
+    qrWidth: "4.7cm",
+    qrHeight: "3.7",
     top: "55%",       // Pehle 90% tha (Bahut niche), ab upar hai
     labelBottom: "0.8cm"
   },
@@ -28,8 +29,9 @@ const STICKER_SIZES = {
     labelBottom: "1.0cm"
   },
   large: { 
-    w: "8cm", h: "11cm", 
-    qrParentSize: "6.5cm", 
+    w: "8cm", h: "11cm",
+    qrWidth: "4.7cm",
+    qrHeight: "3.7",
     qrInternalSize: 140, 
     top: "70%",       // Pehle 45% tha
     labelBottom: "1.2cm"
