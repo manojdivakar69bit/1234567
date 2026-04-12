@@ -14,7 +14,6 @@ const PRINT_OPTIONS = ["10", "20", "50", "100", "500", "1000"] as const;
 const STICKER_SIZES = {
   small: { 
     w: "5cm", h: "7cm", 
-    qrParentSize: "2.8cm",
     qrWidth: "4.7cm",
     qrHeight: "3.7cm",
     top: "50%",       // Pehle 90% tha (Bahut niche), ab upar hai
