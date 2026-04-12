@@ -104,6 +104,59 @@ export type Database = {
         }
         Relationships: []
       }
+      commissions: {
+        Row: {
+          collector_name: string | null
+          collector_role: string
+          commission_amount: number
+          created_at: string
+          id: string
+          order_amount: number
+          order_ref: string
+          paid_at: string | null
+          paid_utr: string | null
+          payment_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          collector_name?: string | null
+          collector_role?: string
+          commission_amount?: number
+          created_at?: string
+          id?: string
+          order_amount?: number
+          order_ref: string
+          paid_at?: string | null
+          paid_utr?: string | null
+          payment_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          collector_name?: string | null
+          collector_role?: string
+          commission_amount?: number
+          created_at?: string
+          id?: string
+          order_amount?: number
+          order_ref?: string
+          paid_at?: string | null
+          paid_utr?: string | null
+          payment_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commissions_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null

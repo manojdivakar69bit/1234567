@@ -8,11 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ScanLine, ArrowLeft, CheckCircle2, LogOut, IndianRupee, Users, Package, Trash2, Eraser, UserPlus, Database, ChevronDown, ChevronUp, History } from "lucide-react";
+import { ScanLine, ArrowLeft, CheckCircle2, LogOut, IndianRupee, Users, Package, Trash2, Eraser, UserPlus, Database, ChevronDown, ChevronUp, History, QrCode } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import QrScanner from "@/components/QrScanner";
 import EmergencyContactsForm, { type EmergencyContact } from "@/components/EmergencyContactsForm";
 import { useRazorpayCheckout } from "@/hooks/useRazorpayCheckout";
+import UpiPaymentScreen from "@/components/UpiPaymentScreen";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -21,7 +22,7 @@ const AgentPanel = () => {
   const navigate = useNavigate();
   const { initiatePayment } = useRazorpayCheckout();
   
-  const [activeTab, setActiveTab] = useState<"register" | "payment" | "salesman">("register");
+  const [activeTab, setActiveTab] = useState<"register" | "payment" | "salesman" | "upi">("register");
   const [showStockList, setShowStockList] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -231,8 +232,32 @@ const AgentPanel = () => {
       <div className="flex gap-1 bg-white p-1 rounded-xl shadow-sm border">
         <Button size="sm" variant={activeTab === "register" ? "default" : "ghost"} onClick={() => setActiveTab("register")} className={`flex-1 rounded-lg ${activeTab === "register" ? "bg-red-600 text-white shadow-md" : "text-slate-500"}`}>Register</Button>
         <Button size="sm" variant={activeTab === "payment" ? "default" : "ghost"} onClick={() => setActiveTab("payment")} className={`flex-1 rounded-lg ${activeTab === "payment" ? "bg-red-600 text-white shadow-md" : "text-slate-500"}`}>Revenue</Button>
+        <Button size="sm" variant={activeTab === "upi" ? "default" : "ghost"} onClick={() => setActiveTab("upi")} className={`flex-1 rounded-lg ${activeTab === "upi" ? "bg-red-600 text-white shadow-md" : "text-slate-500"}`}>UPI</Button>
         <Button size="sm" variant={activeTab === "salesman" ? "default" : "ghost"} onClick={() => setActiveTab("salesman")} className={`flex-1 rounded-lg ${activeTab === "salesman" ? "bg-red-600 text-white shadow-md" : "text-slate-500"}`}>Team</Button>
       </div>
+
+      {/* UPI TAB */}
+      {activeTab === "upi" && (
+        <div className="space-y-4 animate-in fade-in">
+          <UpiPaymentScreen
+            onPaymentSubmit={async (data) => {
+              const { error } = await supabase.from("payments").insert({
+                amount: data.amount,
+                payment_method: "upi",
+                status: "utr_submitted",
+                collected_by_id: currentAgent?.id,
+                collected_by_role: "agent",
+                collector_name: currentAgent?.name,
+                customer_name: data.customerName,
+                agent_id: currentAgent?.id,
+                notes: `Phone: ${data.customerPhone} | UTR: ${data.utr} | Ref: ${data.orderRef}`,
+              });
+              if (error) throw error;
+              queryClient.invalidateQueries({ queryKey: ["team_payments"] });
+            }}
+          />
+        </div>
+      )}
 
       {/* REVENUE TAB (PAYMENT SYSTEM) */}
       {activeTab === "payment" && (
