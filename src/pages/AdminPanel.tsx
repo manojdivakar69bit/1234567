@@ -18,6 +18,47 @@ import PrintHistoryCard from "@/components/PrintHistoryCard";
 import UpiPaymentScreen from "@/components/UpiPaymentScreen";
 import CommissionTracker from "@/components/CommissionTracker";
 
+// Helper: expiry date calculate karo
+const calcExpiresAt = (validity: string): string | null => {
+  const now = new Date();
+  if (validity === "6month") {
+    now.setMonth(now.getMonth() + 6);
+    return now.toISOString();
+  } else if (validity === "1year") {
+    now.setFullYear(now.getFullYear() + 1);
+    return now.toISOString();
+  } else if (validity === "5year") {
+    now.setFullYear(now.getFullYear() + 5);
+    return now.toISOString();
+  } else if (validity === "lifetime") {
+    return null;
+  }
+  return null;
+};
+
+// Helper: age text
+const getAgeText = (activated_at: string) => {
+  const days = Math.floor((Date.now() - new Date(activated_at).getTime()) / 86400000);
+  if (days === 0) return { text: "Today", color: "text-green-600" };
+  if (days === 1) return { text: "1 day", color: "text-blue-600" };
+  if (days <= 30) return { text: `${days} days`, color: "text-blue-600" };
+  if (days <= 365) return { text: `${Math.floor(days / 30)} months`, color: "text-orange-600" };
+  return { text: `${Math.floor(days / 365)} yr ${Math.floor((days % 365) / 30)} mo`, color: "text-red-600" };
+};
+
+// Helper: row ka background color
+const getRowBg = (q: any) => {
+  if (q.status !== "activated") return "";
+  if (!q.expires_at && q.validity !== "lifetime") return "";
+  if (q.validity === "lifetime") return "";
+  const now = new Date();
+  const exp = new Date(q.expires_at);
+  const daysLeft = Math.floor((exp.getTime() - now.getTime()) / 86400000);
+  if (daysLeft < 0) return "bg-red-50 border-red-200"; // Expired
+  if (daysLeft <= 30) return "bg-orange-50 border-orange-200"; // Expiring soon
+  return "";
+};
+
 const AdminPanel = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -28,7 +69,6 @@ const AdminPanel = () => {
   const [assignTo, setAssignTo] = useState("");
   const [assignAgentId, setAssignAgentId] = useState("");
 
-  // ✅ UPI ID field added, bank details optional
   const [agentForm, setAgentForm] = useState({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
   const [salesmanForm, setSalesmanForm] = useState({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
 
@@ -81,7 +121,6 @@ const AdminPanel = () => {
     }
   });
 
-  // ✅ Print history query
   const { data: printHistory = [] } = useQuery({
     queryKey: ["print_history"],
     queryFn: async () => {
@@ -108,6 +147,18 @@ const AdminPanel = () => {
   const salesmanComm = Number(settingsForm.salesman_commission) || 0;
   const adminShare = qrPrice - agentComm - salesmanComm;
   const approvedAgents = agents.filter((a: any) => a.approval_status === "approved");
+
+  // Expired QRs count
+  const expiredCount = qrCodes.filter((q: any) => {
+    if (q.status !== "activated" || q.validity === "lifetime" || !q.expires_at) return false;
+    return new Date(q.expires_at) < new Date();
+  }).length;
+
+  const expiringSoonCount = qrCodes.filter((q: any) => {
+    if (q.status !== "activated" || q.validity === "lifetime" || !q.expires_at) return false;
+    const daysLeft = Math.floor((new Date(q.expires_at).getTime() - Date.now()) / 86400000);
+    return daysLeft >= 0 && daysLeft <= 30;
+  }).length;
 
   // --- MUTATIONS ---
   const saveSettingsMutation = useMutation({
@@ -154,7 +205,6 @@ const AdminPanel = () => {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  // ✅ Agent registration — onError added, upi_id added, bank optional
   const addAgentMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke("create-agent", { 
@@ -179,7 +229,6 @@ const AdminPanel = () => {
     onError: (err: any) => toast.error(err.message || "Agent registration failed"),
   });
 
-  // ✅ Salesman registration — onError added, upi_id added, bank optional
   const addSalesmanMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke("create-salesman", { 
@@ -244,7 +293,6 @@ const AdminPanel = () => {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["qr_codes"] }); toast.success("Range Updated!"); }
   });
 
-  // ✅ Print history delete single
   const deletePrintHistoryMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("print_history").delete().eq("id", id);
@@ -257,7 +305,6 @@ const AdminPanel = () => {
     onError: () => toast.error("Delete failed"),
   });
 
-  // ✅ Print history clear all
   const clearAllPrintHistoryMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("print_history").delete().neq("id", "");
@@ -307,6 +354,22 @@ const AdminPanel = () => {
           <div className="text-xs text-orange-900 uppercase font-bold">Total Collection</div>
         </Card>
       </div>
+
+      {/* EXPIRY ALERTS */}
+      {(expiredCount > 0 || expiringSoonCount > 0) && (
+        <div className="flex flex-col gap-2">
+          {expiredCount > 0 && (
+            <div className="bg-red-50 border border-red-300 rounded-lg px-4 py-2 text-red-700 font-semibold text-xs flex items-center gap-2">
+              ⚠ {expiredCount} QR code{expiredCount > 1 ? "s" : ""} expired — automatically deactivate ho jayenge raat 12 baje
+            </div>
+          )}
+          {expiringSoonCount > 0 && (
+            <div className="bg-orange-50 border border-orange-300 rounded-lg px-4 py-2 text-orange-700 font-semibold text-xs flex items-center gap-2">
+              🕐 {expiringSoonCount} QR code{expiringSoonCount > 1 ? "s" : ""} 30 din mein expire hone wale hain
+            </div>
+          )}
+        </div>
+      )}
 
       {/* PAYMENT HISTORY */}
       <Card className="border-slate-200 shadow-sm overflow-hidden">
@@ -414,7 +477,6 @@ const AdminPanel = () => {
       {/* REGISTRATION FORMS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        {/* ✅ AGENT FORM — UPI ID added, bank optional, button fixed */}
         <Card className="border-blue-100 shadow-sm">
           <CardHeader className="py-3 bg-blue-50/50 border-b">
             <CardTitle className="text-sm flex items-center gap-2"><UserPlus size={16}/> New Agent</CardTitle>
@@ -437,17 +499,12 @@ const AdminPanel = () => {
                 <Input placeholder="IFSC" value={agentForm.ifsc} onChange={e=>setAgentForm({...agentForm, ifsc: e.target.value})} />
               </div>
             </div>
-            <Button
-              onClick={() => addAgentMutation.mutate()}
-              disabled={addAgentMutation.isPending}
-              className="w-full"
-            >
+            <Button onClick={() => addAgentMutation.mutate()} disabled={addAgentMutation.isPending} className="w-full">
               {addAgentMutation.isPending ? "Registering..." : "Register Agent"}
             </Button>
           </CardContent>
         </Card>
 
-        {/* ✅ SALESMAN FORM — UPI ID added, bank optional, button fixed */}
         <Card className="border-purple-100 shadow-sm">
           <CardHeader className="py-3 bg-purple-50/50 border-b">
             <CardTitle className="text-sm flex items-center gap-2"><UserPlus size={16}/> New Salesman</CardTitle>
@@ -470,12 +527,7 @@ const AdminPanel = () => {
                 <Input placeholder="IFSC" value={salesmanForm.ifsc} onChange={e=>setSalesmanForm({...salesmanForm, ifsc: e.target.value})} />
               </div>
             </div>
-            <Button
-              onClick={() => addSalesmanMutation.mutate()}
-              disabled={addSalesmanMutation.isPending}
-              variant="secondary"
-              className="w-full"
-            >
+            <Button onClick={() => addSalesmanMutation.mutate()} disabled={addSalesmanMutation.isPending} variant="secondary" className="w-full">
               {addSalesmanMutation.isPending ? "Registering..." : "Register Salesman"}
             </Button>
           </CardContent>
@@ -514,46 +566,161 @@ const AdminPanel = () => {
       <Card className="border-slate-200 shadow-sm overflow-hidden">
         <CardHeader className="bg-slate-50 py-3 border-b flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold">Generated QR Codes</CardTitle>
-          <Badge variant="secondary">{qrCodes.length} Total</Badge>
+          <div className="flex items-center gap-2">
+            {expiredCount > 0 && <Badge className="bg-red-100 text-red-700 border-red-300 text-[10px]">⚠ {expiredCount} Expired</Badge>}
+            {expiringSoonCount > 0 && <Badge className="bg-orange-100 text-orange-700 border-orange-300 text-[10px]">🕐 {expiringSoonCount} Expiring</Badge>}
+            <Badge variant="secondary">{qrCodes.length} Total</Badge>
+          </div>
         </CardHeader>
         <CardContent className="p-0 max-h-72 overflow-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 text-[10px] uppercase sticky top-0">
-              <tr><th className="p-3">Code</th><th className="p-3">Status</th><th className="p-3">Agent</th><th className="p-3 text-center">Action</th></tr>
+              <tr>
+                <th className="p-3">Code</th>
+                <th className="p-3">Status</th>
+                <th className="p-3">Agent</th>
+                <th className="p-3">Activated</th>
+                <th className="p-3">Validity</th>
+                <th className="p-3">Expires</th>
+                <th className="p-3">Age</th>
+                <th className="p-3 text-center">Action</th>
+              </tr>
             </thead>
             <tbody>
-              {qrCodes.map((q: any) => (
-                <tr key={q.id} className="border-b hover:bg-slate-50">
-                  <td className="p-3 font-mono font-bold">{q.code}</td>
-                  <td className="p-3">
-                    <Badge variant={q.status === 'activated' ? 'default' : q.status === 'assigned' ? 'secondary' : 'outline'}>
-                      {q.status}
-                    </Badge>
-                  </td>
-                  <td className="p-3 text-xs text-muted-foreground">{q.agents?.name || '—'}</td>
-                  <td className="p-3 text-center">
-                    {q.status === 'activated' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[10px] border-red-300 text-red-600 hover:bg-red-50"
-                        onClick={async () => {
-                          if (!confirm(`Deactivate ${q.code}?`)) return;
-                          const { error } = await supabase.from("qr_codes").update({ status: "available" }).eq("id", q.id);
-                          if (error) toast.error("Failed"); 
-                          else { queryClient.invalidateQueries({ queryKey: ["qr_codes"] }); toast.success(`${q.code} deactivated!`); }
-                        }}
-                      >
-                        Deactivate
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {qrCodes.length === 0 && <tr><td colSpan={3} className="p-8 text-center text-slate-400">No QR codes yet</td></tr>}
+              {qrCodes.map((q: any) => {
+                const rowBg = getRowBg(q);
+                const isExpired = q.expires_at && q.validity !== "lifetime" && new Date(q.expires_at) < new Date();
+                const daysLeft = q.expires_at && q.validity !== "lifetime"
+                  ? Math.floor((new Date(q.expires_at).getTime() - Date.now()) / 86400000)
+                  : null;
+
+                return (
+                  <tr key={q.id} className={`border-b hover:brightness-95 ${rowBg}`}>
+                    <td className="p-3 font-mono font-bold">{q.code}</td>
+                    <td className="p-3">
+                      <Badge variant={q.status === 'activated' ? 'default' : q.status === 'assigned' ? 'secondary' : 'outline'}>
+                        {q.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-xs text-muted-foreground">{q.agents?.name || '—'}</td>
+
+                    {/* Activation Date */}
+                    <td className="p-3 text-xs text-muted-foreground">
+                      {q.activated_at
+                        ? new Date(q.activated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : '—'}
+                    </td>
+
+                    {/* Validity Badge */}
+                    <td className="p-3">
+                      {q.validity ? (
+                        <Badge variant="outline" className={
+                          q.validity === 'lifetime' ? 'border-purple-400 text-purple-700' :
+                          q.validity === '5year' ? 'border-blue-400 text-blue-700' :
+                          q.validity === '1year' ? 'border-green-400 text-green-700' :
+                          'border-orange-400 text-orange-700'
+                        }>
+                          {q.validity === '6month' ? '6 Months' :
+                           q.validity === '1year' ? '1 Year' :
+                           q.validity === '5year' ? '5 Years' :
+                           q.validity === 'lifetime' ? '♾ Lifetime' : q.validity}
+                        </Badge>
+                      ) : '—'}
+                    </td>
+
+                    {/* Expiry */}
+                    <td className="p-3 text-xs">
+                      {q.validity === 'lifetime'
+                        ? <span className="text-purple-600 font-semibold">Never</span>
+                        : q.expires_at ? (
+                          <span className={isExpired ? 'text-red-600 font-bold' : daysLeft !== null && daysLeft <= 30 ? 'text-orange-600 font-semibold' : 'text-slate-600'}>
+                            {isExpired ? '⚠ Expired' : daysLeft !== null && daysLeft === 0 ? '⚠ Today' : new Date(q.expires_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            {!isExpired && daysLeft !== null && daysLeft <= 30 && daysLeft > 0 && (
+                              <span className="block text-[10px] text-orange-500">{daysLeft}d left</span>
+                            )}
+                          </span>
+                        ) : '—'}
+                    </td>
+
+                    {/* Age */}
+                    <td className="p-3 text-xs font-semibold">
+                      {q.activated_at ? (() => {
+                        const { text, color } = getAgeText(q.activated_at);
+                        return <span className={color}>{text}</span>;
+                      })() : '—'}
+                    </td>
+
+                    {/* Action */}
+                    <td className="p-3 text-center">
+                      {q.status === 'activated' && (
+                        <div className="flex flex-col gap-1 min-w-[110px]">
+                          {/* Validity Change */}
+                          <select
+                            className="w-full text-[10px] border rounded px-1 py-0.5 text-slate-600 bg-white"
+                            defaultValue=""
+                            onChange={async (e) => {
+                              const val = e.target.value;
+                              if (!val) return;
+                              const expires_at = calcExpiresAt(val);
+                              const { error } = await supabase
+                                .from("qr_codes")
+                                .update({ validity: val, expires_at })
+                                .eq("id", q.id);
+                              if (error) toast.error("Update failed");
+                              else {
+                                queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
+                                toast.success("Validity updated!");
+                              }
+                              e.target.value = "";
+                            }}
+                          >
+                            <option value="">Change Validity</option>
+                            <option value="6month">6 Months</option>
+                            <option value="1year">1 Year</option>
+                            <option value="5year">5 Years</option>
+                            <option value="lifetime">♾ Lifetime</option>
+                          </select>
+
+                          {/* Deactivate */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[10px] w-full border-red-300 text-red-600 hover:bg-red-50"
+                            onClick={async () => {
+                              if (!confirm(`Deactivate ${q.code}? Customer ka saara data erase ho jayega.`)) return;
+                              await supabase.from("emergency_contacts").delete().eq("qr_code", q.code);
+                              const { error } = await supabase
+                                .from("qr_codes")
+                                .update({ status: "available", activated_at: null, validity: null, expires_at: null })
+                                .eq("id", q.id);
+                              if (error) toast.error("Deactivate failed");
+                              else {
+                                queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
+                                toast.success(`${q.code} deactivated & data erased!`);
+                              }
+                            }}
+                          >
+                            Deactivate
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {qrCodes.length === 0 && (
+                <tr><td colSpan={8} className="p-8 text-center text-slate-400">No QR codes yet</td></tr>
+              )}
             </tbody>
           </table>
         </CardContent>
+
+        {/* Legend */}
+        <div className="px-4 py-2 bg-slate-50 border-t flex gap-4 text-[10px] text-slate-500">
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-300 inline-block"/> Expired</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-orange-100 border border-orange-300 inline-block"/> Expiring in 30 days</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-white border border-slate-200 inline-block"/> Active</span>
+        </div>
       </Card>
 
       {/* PRICING CONTROL */}
@@ -627,7 +794,7 @@ const AdminPanel = () => {
       {/* BULK STICKER PRINT */}
       <BulkStickerPrintCard baseUrl={window.location.origin} printableCount={qrCodes.filter((q: any) => q.status !== 'activated').length} />
 
-      {/* ✅ PRINT HISTORY — with delete per row + clear all */}
+      {/* PRINT HISTORY */}
       <Card className="border-slate-200 shadow-sm overflow-hidden">
         <CardHeader className="bg-slate-50 py-3 border-b flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-bold">Print History</CardTitle>
