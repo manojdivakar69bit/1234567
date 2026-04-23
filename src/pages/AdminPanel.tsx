@@ -688,51 +688,61 @@ const AdminPanel = () => {
                               disabled={isProcessing === q.id}
                               className="h-7 text-[10px] w-full border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50"
                               onClick={async () => {
-                                if (!confirm(`Deactivate ${q.code}? Customer ka saara data erase ho jayega.`)) return;
+  if (!confirm(`Deactivate ${q.code}? Customer ka saara data erase ho jayega.`)) return;
 
-                                setIsProcessing(q.id);
-                                try {
-                                  const { data: customer } = await supabase
-                                    .from("customers")
-                                    .select("id")
-                                    .eq("qr_code_id", q.id)
-                                    .maybeSingle();
+  setIsProcessing(q.id);
 
-                                  if (customer) {
-                                    await supabase
-                                      .from("emergency_contacts")
-                                      .delete()
-                                      .eq("customer_id", customer.id);
+  try {
+    // STEP 1: Find customer linked to QR
+    const { data: customer, error: custErr } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("qr_code_id", q.id)
+      .maybeSingle();
 
-                                    await supabase
-                                      .from("customers")
-                                      .delete()
-                                      .eq("id", customer.id);
-                                  }
+    if (custErr) throw custErr;
 
-                                  const { error: qrError } = await supabase
-                                    .from("qr_codes")
-                                    .update({ 
-                                      status: "available", 
-                                      activated_at: null, 
-                                      validity: null, 
-                                      expires_at: null 
-                                    })
-                                    .eq("id", q.id);
+    // STEP 2: Delete emergency contacts
+    if (customer?.id) {
+      const { error: ecErr } = await supabase
+        .from("emergency_contacts")
+        .delete()
+        .eq("qr_code_id", q.id);
 
-                                  if (qrError) throw qrError;
+      if (ecErr) throw ecErr;
 
-                                  queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
-                                  toast.success(`${q.code} reset done!`);
-                                } catch (err) {
-                                  console.error("Error:", err);
-                                  toast.error("Deactivation failed!");
-                                } finally {
-                                  setIsProcessing(null);
-                                }
-                              }}
-                            >
-                              {isProcessing === q.id ? "Wait..." : "Deactivate"}
+      // STEP 3: Delete customer
+      const { error: delCustErr } = await supabase
+        .from("customers")
+        .delete()
+        .eq("id", customer.id);
+
+      if (delCustErr) throw delCustErr;
+    }
+
+    // STEP 4: Reset QR
+    const { error: qrError } = await supabase
+      .from("qr_codes")
+      .update({
+        status: "available",
+        activated_at: null,
+        validity: null,
+        expires_at: null,
+      })
+      .eq("id", q.id);
+
+    if (qrError) throw qrError;
+
+    queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
+    toast.success(`${q.code} successfully deactivated!`);
+
+  } catch (err) {
+    console.error("Deactivation error:", err);
+    toast.error("Deactivation failed!");
+  } finally {
+    setIsProcessing(null);
+  }
+}}
                             </Button>
                             </div>
                           )}
