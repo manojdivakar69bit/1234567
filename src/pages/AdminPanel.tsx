@@ -68,7 +68,7 @@ const AdminPanel = () => {
   const [assignFrom, setAssignFrom] = useState("");
   const [assignTo, setAssignTo] = useState("");
   const [assignAgentId, setAssignAgentId] = useState("");
-
+  const [isProcessing, setIsProcessing] = useState(null);
   const [agentForm, setAgentForm] = useState({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
   const [salesmanForm, setSalesmanForm] = useState({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
 
@@ -681,39 +681,49 @@ const AdminPanel = () => {
                             <option value="lifetime">♾ Lifetime</option>
                           </select>
 
-                          {/* Deactivate */}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-[10px] w-full border-red-300 text-red-600 hover:bg-red-50"
-                            onClick={async () => {
-                              if (!confirm(`Deactivate ${q.code}? Customer ka saara data erase ho jayega.`)) return;
-                              await supabase.from("emergency_contacts").delete().eq("qr_code", q.code);
-                              const { error } = await supabase
-                                .from("qr_codes")
-                                .update({ status: "available", activated_at: null, validity: null, expires_at: null })
-                                .eq("id", q.id);
-                              if (error) toast.error("Deactivate failed");
-                              else {
-                                queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
-                                toast.success(`${q.code} deactivated & data erased!`);
-                              }
-                            }}
-                          >
-                            Deactivate
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-              {qrCodes.length === 0 && (
-                <tr><td colSpan={8} className="p-8 text-center text-slate-400">No QR codes yet</td></tr>
-              )}
-            </tbody>
-          </table>
-        </CardContent>
+                            {/* Deactivate */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={isProcessing === q.id}
+                              className="h-7 text-[10px] w-full border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                              onClick={async () => {
+                                if (!confirm(`Deactivate ${q.code}? Customer ka saara data erase ho jayega.`)) return;
+
+                                setIsProcessing(q.id);
+                                try {
+                                  // 1. Dono tables se data delete karein
+                                  await Promise.all([
+                                    supabase.from("customers").delete().eq("qr_code_id", q.id),
+                                    supabase.from("emergency_contacts").delete().eq("qr_code_id", q.id)
+                                  ]);
+
+                                  // 2. QR status reset karein
+                                  const { error } = await supabase
+                                    .from("qr_codes")
+                                    .update({ 
+                                      status: "available", 
+                                      activated_at: null, 
+                                      validity: null, 
+                                      expires_at: null 
+                                    })
+                                    .eq("id", q.id);
+
+                                  if (error) throw error;
+
+                                  queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
+                                  toast.success(`${q.code} deactivated & data erased!`);
+                                } catch (err) {
+                                  console.error(err);
+                                  toast.error("Deactivate failed!");
+                                } finally {
+                                  setIsProcessing(null);
+                                }
+                              }}
+                            >
+                              {isProcessing === q.id ? "Processing..." : "Deactivate"}
+                            </Button>
+
 
         {/* Legend */}
         <div className="px-4 py-2 bg-slate-50 border-t flex gap-4 text-[10px] text-slate-500">
