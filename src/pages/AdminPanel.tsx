@@ -735,7 +735,7 @@ const AdminPanel = () => {
                               {isProcessing === q.id ? "Wait..." : "Deactivate"}
                             </Button>
                             </div>
-                        )}
+                          )}
                       </td>
                     </tr>
                           
