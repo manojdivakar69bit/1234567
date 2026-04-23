@@ -723,6 +723,12 @@ const AdminPanel = () => {
                             >
                               {isProcessing === q.id ? "Processing..." : "Deactivate"}
                             </Button>
+                        </div>
+                        )}
+                      </td>
+                    </tr>
+                          
+                          
 
 
         {/* Legend */}
