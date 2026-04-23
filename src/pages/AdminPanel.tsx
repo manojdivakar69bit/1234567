@@ -682,9 +682,9 @@ const AdminPanel = () => {
                           </select>
 
                             {/* Deactivate */}
-                            <Button
+                          {<Button
                               size="sm"
-                              variant="outline"
+                             variant="outline"
                               disabled={isProcessing === q.id}
                               className="h-7 text-[10px] w-full border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50"
                               onClick={async () => {
@@ -692,14 +692,25 @@ const AdminPanel = () => {
 
                                 setIsProcessing(q.id);
                                 try {
-                                  // 1. Dono tables se data delete karein
-                                  await Promise.all([
-                                    supabase.from("customers").delete().eq("qr_code_id", q.id),
-                                    supabase.from("emergency_contacts").delete().eq("qr_code_id", q.id)
-                                  ]);
+                                  const { data: customer } = await supabase
+                                    .from("customers")
+                                    .select("id")
+                                    .eq("qr_code_id", q.id)
+                                    .maybeSingle();
 
-                                  // 2. QR status reset karein
-                                  const { error } = await supabase
+                                  if (customer) {
+                                    await supabase
+                                      .from("emergency_contacts")
+                                      .delete()
+                                      .eq("customer_id", customer.id);
+
+                                    await supabase
+                                      .from("customers")
+                                      .delete()
+                                      .eq("id", customer.id);
+                                  }
+
+                                  const { error: qrError } = await supabase
                                     .from("qr_codes")
                                     .update({ 
                                       status: "available", 
@@ -709,21 +720,21 @@ const AdminPanel = () => {
                                     })
                                     .eq("id", q.id);
 
-                                  if (error) throw error;
+                                  if (qrError) throw qrError;
 
                                   queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
-                                  toast.success(`${q.code} deactivated & data erased!`);
+                                  toast.success(`${q.code} reset done!`);
                                 } catch (err) {
-                                  console.error(err);
-                                  toast.error("Deactivate failed!");
+                                  console.error("Error:", err);
+                                  toast.error("Deactivation failed!");
                                 } finally {
                                   setIsProcessing(null);
                                 }
                               }}
                             >
-                              {isProcessing === q.id ? "Processing..." : "Deactivate"}
+                              {isProcessing === q.id ? "Wait..." : "Deactivate"}
                             </Button>
-                        </div>
+                            </div>
                         )}
                       </td>
                     </tr>
