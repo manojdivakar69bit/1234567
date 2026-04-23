@@ -728,10 +728,7 @@ const AdminPanel = () => {
                       </td>
                     </tr>
                           
-                          
-
-
-        {/* Legend */}
+      {/* Legend */}
         <div className="px-4 py-2 bg-slate-50 border-t flex gap-4 text-[10px] text-slate-500">
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-300 inline-block"/> Expired</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-orange-100 border border-orange-300 inline-block"/> Expiring in 30 days</span>
