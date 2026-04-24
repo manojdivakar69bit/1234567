@@ -700,7 +700,7 @@ const AdminPanel = () => {
                               // ✅ QR status reset
                               const { error } = await supabase
                                 .from("qr_codes")
-                                .update({ status: "available", activated_at: null, validity: null, expires_at: null })
+                                .update({ status: "available", validity: null, expires_at: null })
                                 .eq("id", q.id);
 
                               if (error) toast.error("QR reset failed: " + error.message);
