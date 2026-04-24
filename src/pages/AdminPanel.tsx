@@ -690,10 +690,12 @@ const AdminPanel = () => {
                               if (!confirm(`Deactivate ${q.code}? Customer ka saara data erase ho jayega.`)) return;
 
                               // ✅ customers delete — qr_code_id (UUID) se
-                              await supabase.from("customers").delete().eq("qr_code_id", q.id);
+                              const { error: custErr } = await supabase.from("customers").delete().eq("qr_code_id", q.id);
+                              if (custErr) { toast.error("Customers delete failed: " + custErr.message); return; }
 
                               // ✅ emergency_contacts delete — qr_code_id (UUID) se
-                              await supabase.from("emergency_contacts").delete().eq("qr_code_id", q.id);
+                              const { error: ecErr } = await supabase.from("emergency_contacts").delete().eq("qr_code_id", q.id);
+                              if (ecErr) { toast.error("Contacts delete failed: " + ecErr.message); return; }
 
                               // ✅ QR status reset
                               const { error } = await supabase
@@ -701,7 +703,7 @@ const AdminPanel = () => {
                                 .update({ status: "available", activated_at: null, validity: null, expires_at: null })
                                 .eq("id", q.id);
 
-                              if (error) toast.error("Deactivate failed");
+                              if (error) toast.error("QR reset failed: " + error.message);
                               else {
                                 queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
                                 toast.success(`${q.code} deactivated & data erased!`);
