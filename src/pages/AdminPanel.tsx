@@ -68,7 +68,7 @@ const AdminPanel = () => {
   const [assignFrom, setAssignFrom] = useState("");
   const [assignTo, setAssignTo] = useState("");
   const [assignAgentId, setAssignAgentId] = useState("");
-  const [isProcessing, setIsProcessing] = useState(null);
+
   const [agentForm, setAgentForm] = useState({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
   const [salesmanForm, setSalesmanForm] = useState({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
 
@@ -681,75 +681,49 @@ const AdminPanel = () => {
                             <option value="lifetime">♾ Lifetime</option>
                           </select>
 
-                            {/* Deactivate */}
-                          {<Button
-                              size="sm"
-                             variant="outline"
-                              disabled={isProcessing === q.id}
-                              className="h-7 text-[10px] w-full border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                              onClick={async () => {
-  if (!confirm(`Deactivate ${q.code}? Customer ka saara data erase ho jayega.`)) return;
+                          {/* Deactivate */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[10px] w-full border-red-300 text-red-600 hover:bg-red-50"
+                            onClick={async () => {
+                              if (!confirm(`Deactivate ${q.code}? Customer ka saara data erase ho jayega.`)) return;
 
-  setIsProcessing(q.id);
+                              // ✅ customers delete — qr_code_id (UUID) se
+                              await supabase.from("customers").delete().eq("qr_code_id", q.id);
 
-  try {
-    // STEP 1: Find customer linked to QR
-    const { data: customer, error: custErr } = await supabase
-      .from("customers")
-      .select("id")
-      .eq("qr_code_id", q.id)
-      .maybeSingle();
+                              // ✅ emergency_contacts delete — qr_code_id (UUID) se
+                              await supabase.from("emergency_contacts").delete().eq("qr_code_id", q.id);
 
-    if (custErr) throw custErr;
+                              // ✅ QR status reset
+                              const { error } = await supabase
+                                .from("qr_codes")
+                                .update({ status: "available", activated_at: null, validity: null, expires_at: null })
+                                .eq("id", q.id);
 
-    // STEP 2: Delete emergency contacts
-    if (customer?.id) {
-      const { error: ecErr } = await supabase
-        .from("emergency_contacts")
-        .delete()
-        .eq("qr_code_id", q.id);
+                              if (error) toast.error("Deactivate failed");
+                              else {
+                                queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
+                                toast.success(`${q.code} deactivated & data erased!`);
+                              }
+                            }}
+                          >
+                            Deactivate
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {qrCodes.length === 0 && (
+                <tr><td colSpan={8} className="p-8 text-center text-slate-400">No QR codes yet</td></tr>
+              )}
+            </tbody>
+          </table>
+        </CardContent>
 
-      if (ecErr) throw ecErr;
-
-      // STEP 3: Delete customer
-      const { error: delCustErr } = await supabase
-        .from("customers")
-        .delete()
-        .eq("id", customer.id);
-
-      if (delCustErr) throw delCustErr;
-    }
-
-    // STEP 4: Reset QR
-    const { error: qrError } = await supabase
-      .from("qr_codes")
-      .update({
-        status: "available",
-        activated_at: null,
-        validity: null,
-        expires_at: null,
-      })
-      .eq("id", q.id);
-
-    if (qrError) throw qrError;
-
-    queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
-    toast.success(`${q.code} successfully deactivated!`);
-
-  } catch (err) {
-    console.error("Deactivation error:", err);
-    toast.error("Deactivation failed!");
-  } finally {
-    setIsProcessing(null);
-  }
-}}
-                            </Button>
-                            </div>
-                          )}
-                      </td>
-                    </tr>
-                          
-      {/* Legend */}
+        {/* Legend */}
         <div className="px-4 py-2 bg-slate-50 border-t flex gap-4 text-[10px] text-slate-500">
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-300 inline-block"/> Expired</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-orange-100 border border-orange-300 inline-block"/> Expiring in 30 days</span>
