@@ -14,6 +14,7 @@ const STICKER_SIZES = {
     w: "5cm", h: "7cm", 
     qrWidth: "4.7cm",
     qrHeight: "3.7cm",
+    qrInternalSize: 90,
     top: "50%",
     labelBottom: "0.8cm"
   },
