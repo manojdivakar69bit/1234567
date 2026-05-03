@@ -137,6 +137,7 @@ const RegisterPage = () => {
         amount: qrPrice,
         payment_method: "upi",
         status: "utr_submitted",
+        collected_by_role: "customer",
         customer_name: form.name,
         notes: `Phone: ${customerPhone} | UTR: ${utr} | Ref: ${orderRef}`,
       });
