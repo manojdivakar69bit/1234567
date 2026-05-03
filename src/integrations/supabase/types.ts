@@ -334,27 +334,33 @@ export type Database = {
           assigned_salesman_id: string | null
           code: string
           created_at: string
+          expires_at: string | null
           id: string
           status: string
           updated_at: string
+          validity: string | null
         }
         Insert: {
           assigned_agent_id?: string | null
           assigned_salesman_id?: string | null
           code: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           status?: string
           updated_at?: string
+          validity?: string | null
         }
         Update: {
           assigned_agent_id?: string | null
           assigned_salesman_id?: string | null
           code?: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           status?: string
           updated_at?: string
+          validity?: string | null
         }
         Relationships: [
           {
