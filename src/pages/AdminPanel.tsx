@@ -590,6 +590,27 @@ const AdminPanel = () => {
               <Button onClick={() => rangeActionMutation.mutate("assign")} className="flex-1">Assign</Button>
               <Button onClick={() => rangeActionMutation.mutate("unassign")} variant="outline" className="flex-1">Unassign</Button>
             </div>
+            <div className="border-t pt-3 mt-2 space-y-2">
+              <div className="text-xs font-bold text-slate-600">Quick Assign</div>
+              <Input
+                type="number"
+                min={1}
+                placeholder="How many QR codes? (e.g. 10)"
+                value={quickCount}
+                onChange={e => setQuickCount(e.target.value)}
+              />
+              <Select value={quickAgentId} onValueChange={setQuickAgentId}>
+                <SelectTrigger><SelectValue placeholder="Select Agent" /></SelectTrigger>
+                <SelectContent>{approvedAgents.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+              </Select>
+              <Button
+                onClick={() => quickAssignMutation.mutate()}
+                disabled={quickAssignMutation.isPending}
+                className="w-full"
+              >
+                {quickAssignMutation.isPending ? "Assigning..." : "Quick Assign"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
