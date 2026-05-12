@@ -151,6 +151,34 @@ const AdminPanel = () => {
   const adminShare = qrPrice - agentComm - salesmanComm;
   const approvedAgents = agents.filter((a: any) => a.approval_status === "approved");
 
+  // Bulk-assign selection state
+  const [selectedQrIds, setSelectedQrIds] = useState<string[]>([]);
+  const [bulkAssignAgentId, setBulkAssignAgentId] = useState("");
+
+  const toggleQrSelected = (id: string) => {
+    setSelectedQrIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: async () => {
+      if (!bulkAssignAgentId) throw new Error("Select an agent");
+      if (selectedQrIds.length === 0) throw new Error("Select at least one QR");
+      const { error } = await supabase
+        .from("qr_codes")
+        .update({ assigned_agent_id: bulkAssignAgentId, status: "assigned" })
+        .in("id", selectedQrIds);
+      if (error) throw error;
+      return selectedQrIds.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
+      toast.success(`${count} QR code(s) assigned!`);
+      setSelectedQrIds([]);
+      setBulkAssignAgentId("");
+    },
+    onError: (e: any) => toast.error(e.message || "Bulk assign failed"),
+  });
+
   // Expired QRs count
   const expiredCount = qrCodes.filter((q: any) => {
     if (q.status !== "activated" || q.validity === "lifetime" || !q.expires_at) return false;
