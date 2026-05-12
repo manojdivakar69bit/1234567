@@ -68,6 +68,8 @@ const AdminPanel = () => {
   const [assignFrom, setAssignFrom] = useState("");
   const [assignTo, setAssignTo] = useState("");
   const [assignAgentId, setAssignAgentId] = useState("");
+  const [quickCount, setQuickCount] = useState("");
+  const [quickAgentId, setQuickAgentId] = useState("");
 
   const [agentForm, setAgentForm] = useState({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
   const [salesmanForm, setSalesmanForm] = useState({ name: "", phone: "", email: "", password: "", upi_id: "", bank: "", acc: "", ifsc: "" });
@@ -291,6 +293,36 @@ const AdminPanel = () => {
       await supabase.from("qr_codes").update(update).in("id", ids);
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["qr_codes"] }); toast.success("Range Updated!"); }
+  });
+
+  const quickAssignMutation = useMutation({
+    mutationFn: async () => {
+      const n = parseInt(quickCount);
+      if (!n || n <= 0) throw new Error("Enter a valid count");
+      if (!quickAgentId) throw new Error("Select an agent");
+      const { data: codes, error } = await supabase
+        .from("qr_codes")
+        .select("id")
+        .eq("status", "available")
+        .is("assigned_agent_id", null)
+        .order("code")
+        .limit(n);
+      if (error) throw error;
+      if (!codes?.length) throw new Error("No available QR codes");
+      const ids = codes.map((q: any) => q.id);
+      const { error: upErr } = await supabase
+        .from("qr_codes")
+        .update({ assigned_agent_id: quickAgentId, status: "assigned" })
+        .in("id", ids);
+      if (upErr) throw upErr;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["qr_codes"] });
+      toast.success(`${count} QR codes assigned!`);
+      setQuickCount("");
+    },
+    onError: (e: any) => toast.error(e.message || "Quick assign failed"),
   });
 
   const deletePrintHistoryMutation = useMutation({
@@ -557,6 +589,27 @@ const AdminPanel = () => {
             <div className="flex gap-2">
               <Button onClick={() => rangeActionMutation.mutate("assign")} className="flex-1">Assign</Button>
               <Button onClick={() => rangeActionMutation.mutate("unassign")} variant="outline" className="flex-1">Unassign</Button>
+            </div>
+            <div className="border-t pt-3 mt-2 space-y-2">
+              <div className="text-xs font-bold text-slate-600">Quick Assign</div>
+              <Input
+                type="number"
+                min={1}
+                placeholder="How many QR codes? (e.g. 10)"
+                value={quickCount}
+                onChange={e => setQuickCount(e.target.value)}
+              />
+              <Select value={quickAgentId} onValueChange={setQuickAgentId}>
+                <SelectTrigger><SelectValue placeholder="Select Agent" /></SelectTrigger>
+                <SelectContent>{approvedAgents.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+              </Select>
+              <Button
+                onClick={() => quickAssignMutation.mutate()}
+                disabled={quickAssignMutation.isPending}
+                className="w-full"
+              >
+                {quickAssignMutation.isPending ? "Assigning..." : "Quick Assign"}
+              </Button>
             </div>
           </CardContent>
         </Card>
