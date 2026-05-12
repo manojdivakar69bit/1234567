@@ -654,10 +654,44 @@ const AdminPanel = () => {
             <Badge variant="secondary">{qrCodes.length} Total</Badge>
           </div>
         </CardHeader>
+        {/* Bulk Assign bar */}
+        <div className="px-4 py-2 bg-blue-50/60 border-b flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-700">
+            {selectedQrIds.length} selected
+          </span>
+          <Select value={bulkAssignAgentId} onValueChange={setBulkAssignAgentId}>
+            <SelectTrigger className="h-8 w-48 text-xs"><SelectValue placeholder="Select Agent" /></SelectTrigger>
+            <SelectContent>
+              {approvedAgents.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            className="h-8 text-xs"
+            disabled={bulkAssignMutation.isPending || selectedQrIds.length === 0 || !bulkAssignAgentId}
+            onClick={() => bulkAssignMutation.mutate()}
+          >
+            {bulkAssignMutation.isPending ? "Assigning..." : "Assign Selected"}
+          </Button>
+          {selectedQrIds.length > 0 && (
+            <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelectedQrIds([])}>
+              Clear
+            </Button>
+          )}
+        </div>
         <CardContent className="p-0 max-h-72 overflow-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 text-[10px] uppercase sticky top-0">
               <tr>
+                <th className="p-3 w-8">
+                  <Checkbox
+                    checked={qrCodes.length > 0 && selectedQrIds.length === qrCodes.length}
+                    onCheckedChange={(c) => {
+                      if (c) setSelectedQrIds(qrCodes.map((q: any) => q.id));
+                      else setSelectedQrIds([]);
+                    }}
+                  />
+                </th>
                 <th className="p-3">Code</th>
                 <th className="p-3">Status</th>
                 <th className="p-3">Agent</th>
@@ -678,6 +712,12 @@ const AdminPanel = () => {
 
                 return (
                   <tr key={q.id} className={`border-b hover:brightness-95 ${rowBg}`}>
+                    <td className="p-3">
+                      <Checkbox
+                        checked={selectedQrIds.includes(q.id)}
+                        onCheckedChange={() => toggleQrSelected(q.id)}
+                      />
+                    </td>
                     <td className="p-3 font-mono font-bold">{q.code}</td>
                     <td className="p-3">
                       <Badge variant={q.status === 'activated' ? 'default' : q.status === 'assigned' ? 'secondary' : 'outline'}>
@@ -801,7 +841,7 @@ const AdminPanel = () => {
                 );
               })}
               {qrCodes.length === 0 && (
-                <tr><td colSpan={8} className="p-8 text-center text-slate-400">No QR codes yet</td></tr>
+                <tr><td colSpan={9} className="p-8 text-center text-slate-400">No QR codes yet</td></tr>
               )}
             </tbody>
           </table>
